@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import type { Repo, Branch, Settings } from "@/lib/types"
 import { agentLabels } from "@/lib/types"
 import { generateId } from "@/lib/store"
-import { GitBranch, Plus, Search, ChevronDown, Loader2, X, Trash2 } from "lucide-react"
+import { GitBranch, Plus, Search, ChevronDown, Loader2, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useState, useRef, useEffect, useCallback } from "react"
 
@@ -66,6 +66,7 @@ export function BranchList({
   const [newBranchBase, setNewBranchBase] = useState(repo.defaultBranch || "main")
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const isResizing = useRef(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const newBranchInputRef = useRef<HTMLInputElement>(null)
@@ -112,6 +113,13 @@ export function BranchList({
       newBranchInputRef.current.focus()
     }
   }, [newBranchOpen])
+
+  // Auto-dismiss branch delete confirmation after 3 seconds
+  useEffect(() => {
+    if (!confirmDeleteId) return
+    const t = setTimeout(() => setConfirmDeleteId(null), 3000)
+    return () => clearTimeout(t)
+  }, [confirmDeleteId])
 
   function startResize() {
     isResizing.current = true
@@ -292,16 +300,30 @@ export function BranchList({
                       </div>
                     </div>
                   </button>
-                  {/* Delete button on hover */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveBranch(branch.id)
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-all hover:bg-destructive/20 hover:text-red-400"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  {/* Delete button on hover — two-click confirmation */}
+                  {confirmDeleteId === branch.id ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfirmDeleteId(null)
+                        onRemoveBranch(branch.id)
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 flex h-6 cursor-pointer items-center gap-1 rounded bg-destructive/20 px-1.5 text-[10px] font-medium text-red-400 transition-all hover:bg-destructive/30"
+                    >
+                      <X className="h-3 w-3" />
+                      Remove?
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfirmDeleteId(branch.id)
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-all hover:bg-destructive/20 hover:text-red-400"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               )
             })}

@@ -27,6 +27,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import Markdown from "react-markdown"
 import {
   Tooltip,
   TooltipContent,
@@ -98,15 +99,23 @@ function MessageBubble({ message }: { message: Message }) {
 
       <div
         className={cn(
-          "rounded-lg px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+          "rounded-lg px-4 py-2.5 text-sm leading-relaxed",
           isUser
-            ? "bg-primary/15 text-foreground"
-            : "bg-secondary/60 text-foreground"
+            ? "bg-primary/15 text-foreground whitespace-pre-wrap"
+            : "bg-secondary/60 text-foreground prose prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
         )}
       >
-        {message.content || (message.role === "assistant" && (
-          <span className="text-muted-foreground/50 italic">Thinking...</span>
-        ))}
+        {message.content ? (
+          isUser ? (
+            message.content
+          ) : (
+            <Markdown>{message.content}</Markdown>
+          )
+        ) : (
+          message.role === "assistant" && (
+            <span className="text-muted-foreground/50 italic">Thinking...</span>
+          )
+        )}
       </div>
 
       {message.toolCalls && message.toolCalls.length > 0 && (

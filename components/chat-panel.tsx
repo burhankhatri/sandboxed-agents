@@ -679,22 +679,27 @@ export function ChatPanel({
             {headerActions.map((action) => {
               const isActive = action.action === "log" && gitHistoryOpen
               const hasPR = action.action === "create-pr" && !!branch.prUrl
+              const isPRLoading = action.action === "create-pr" && actionLoading === "create-pr"
               return (
                 <Tooltip key={action.label}>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => handleHeaderAction(action.action)}
-                      disabled={!isReady || (isBusy && action.action !== "log")}
+                      disabled={!isReady || (isBusy && action.action !== "log") || isPRLoading}
                       className={cn(
                         "flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                         hasPR
-                          ? "text-green-400 shadow-[0_0_8px_rgba(74,222,128,0.4)]"
+                          ? "text-green-400"
                           : isActive
                           ? "bg-accent text-foreground"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       )}
                     >
-                      <action.icon className="h-3.5 w-3.5" />
+                      {isPRLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <action.icon className="h-3.5 w-3.5" />
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">

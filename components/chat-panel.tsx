@@ -877,7 +877,8 @@ export function ChatPanel({
                           const userHost = userHostMatch[1]
                           const port = portMatch ? portMatch[1] : "22"
                           const [owner, repo] = repoFullName.split("/")
-                          const localDir = `./${owner}-${repo}-${branch.name}`
+                          const safeBranch = branch.name.replace(/[^a-zA-Z0-9._-]/g, "-")
+                          const localDir = `./${owner}-${repo}-${safeBranch}`
                           const rsyncCmd = `mkdir -p ${localDir} && \\\nwhile true; do \\\n  rsync -avz --filter=':- .gitignore' -e 'ssh -p ${port}' \\\n    ${userHost}:/home/daytona/${repoName}/ \\\n    ${localDir}/; \\\n  sleep 2; \\\ndone`
                           setRsyncCommand(rsyncCmd)
                           setRsyncCopied(false)

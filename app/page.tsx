@@ -236,6 +236,14 @@ export default function Home() {
           userAvatar={userAvatar}
           onSelectRepo={handleSelectRepo}
           onRemoveRepo={handleRemoveRepo}
+          onReorderRepos={(from, to) => {
+            setRepos((prev) => {
+              const next = [...prev]
+              const [moved] = next.splice(from, 1)
+              next.splice(to, 0, moved)
+              return next
+            })
+          }}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenAddRepo={() => setAddRepoOpen(true)}
         />

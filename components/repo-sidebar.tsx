@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils"
 import type { Repo } from "@/lib/types"
 import { Plus, Settings, X } from "lucide-react"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +24,7 @@ interface RepoSidebarProps {
   userAvatar?: string | null
   onSelectRepo: (repoId: string) => void
   onRemoveRepo: (repoId: string) => void
+  onReorderRepos: (fromIndex: number, toIndex: number) => void
   onOpenSettings: () => void
   onOpenAddRepo: () => void
 }
@@ -34,10 +35,13 @@ export function RepoSidebar({
   userAvatar,
   onSelectRepo,
   onRemoveRepo,
+  onReorderRepos,
   onOpenSettings,
   onOpenAddRepo,
 }: RepoSidebarProps) {
   const [removeModalRepo, setRemoveModalRepo] = useState<Repo | null>(null)
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -57,12 +61,27 @@ export function RepoSidebar({
 
         <div className="mx-auto h-px w-8 bg-border" />
 
-        {repos.map((repo) => {
+        {repos.map((repo, index) => {
           const isActive = repo.id === activeRepoId
           const hasRunning = repo.branches.some((b) => b.status === "running" || b.status === "creating")
           const initials = (repo.owner[0] + repo.name[0]).toUpperCase()
           return (
-            <div key={repo.id} className="relative group">
+            <div
+              key={repo.id}
+              className={cn("relative group", dragOverIndex === index && "opacity-50")}
+              draggable
+              onDragStart={() => { dragIndexRef.current = index }}
+              onDragOver={(e) => { e.preventDefault(); setDragOverIndex(index) }}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={() => {
+                if (dragIndexRef.current !== null && dragIndexRef.current !== index) {
+                  onReorderRepos(dragIndexRef.current, index)
+                }
+                dragIndexRef.current = null
+                setDragOverIndex(null)
+              }}
+              onDragEnd={() => { dragIndexRef.current = null; setDragOverIndex(null) }}
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

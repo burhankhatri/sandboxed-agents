@@ -245,6 +245,21 @@ export function ChatPanel({
     abortControllerRef.current = controller
     let content = ""
     let toolCalls: ToolCall[] = []
+    let hadToolCalls = false
+
+    function startNewBubble() {
+      content = ""
+      toolCalls = []
+      hadToolCalls = false
+      const newMsg: Message = {
+        id: generateId(),
+        role: "assistant",
+        content: "",
+        toolCalls: [],
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      }
+      onAddMessage(newMsg)
+    }
 
     try {
       const response = await fetch("/api/agent/query", {
@@ -283,7 +298,6 @@ export function ChatPanel({
               const data = JSON.parse(line.slice(6))
               if (data.type === "stdout" || data.type === "stderr") {
                 const text = data.content as string
-                // Check for tool use indicator
                 if (text.startsWith("TOOL_USE:")) {
                   const toolSummary = text.replace("TOOL_USE:", "").trim()
                   const toolName = toolSummary.split(":")[0].trim()
@@ -299,7 +313,12 @@ export function ChatPanel({
                       }),
                     },
                   ]
+                  hadToolCalls = true
                 } else {
+                  // If text arrives after tool calls, start a new bubble
+                  if (hadToolCalls && text.trim()) {
+                    startNewBubble()
+                  }
                   content += text
                 }
                 onUpdateLastMessage({ content, toolCalls })

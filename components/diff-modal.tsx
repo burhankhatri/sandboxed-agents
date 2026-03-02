@@ -109,6 +109,7 @@ interface DiffModalProps {
   open: boolean
   onClose: () => void
   sandboxId: string
+  repoOwner: string
   repoName: string
   branchName: string
   baseBranch: string
@@ -117,7 +118,7 @@ interface DiffModalProps {
   commitMessage?: string | null
 }
 
-export function DiffModal({ open, onClose, sandboxId, repoName, branchName, baseBranch, settings, commitHash, commitMessage }: DiffModalProps) {
+export function DiffModal({ open, onClose, sandboxId, repoOwner, repoName, branchName, baseBranch, settings, commitHash, commitMessage }: DiffModalProps) {
   const [branches, setBranches] = useState<string[]>([])
   const [compareBranch, setCompareBranch] = useState(baseBranch)
   const [diff, setDiff] = useState("")
@@ -157,15 +158,15 @@ export function DiffModal({ open, onClose, sandboxId, repoName, branchName, base
     if (!compareBranch) return
     setLoading(true)
     try {
-      const res = await fetch("/api/sandbox/git", {
+      const res = await fetch("/api/github/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
-          sandboxId,
-          repoPath: `/home/daytona/${repoName}`,
-          action: "diff",
-          targetBranch: `origin/${compareBranch}`,
+          githubPat: settings.githubPat,
+          owner: repoOwner,
+          repo: repoName,
+          base: compareBranch,
+          head: branchName,
         }),
       })
       const data = await res.json()
@@ -175,20 +176,19 @@ export function DiffModal({ open, onClose, sandboxId, repoName, branchName, base
     } finally {
       setLoading(false)
     }
-  }, [sandboxId, repoName, compareBranch, settings.daytonaApiKey])
+  }, [repoOwner, repoName, branchName, compareBranch, settings.githubPat])
 
   const fetchCommitDiff = useCallback(async () => {
     if (!commitHash) return
     setLoading(true)
     try {
-      const res = await fetch("/api/sandbox/git", {
+      const res = await fetch("/api/github/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
-          sandboxId,
-          repoPath: `/home/daytona/${repoName}`,
-          action: "diff",
+          githubPat: settings.githubPat,
+          owner: repoOwner,
+          repo: repoName,
           commitHash,
         }),
       })
@@ -199,7 +199,7 @@ export function DiffModal({ open, onClose, sandboxId, repoName, branchName, base
     } finally {
       setLoading(false)
     }
-  }, [sandboxId, repoName, commitHash, settings.daytonaApiKey])
+  }, [repoOwner, repoName, commitHash, settings.githubPat])
 
   useEffect(() => {
     if (open && !isCommitMode) {

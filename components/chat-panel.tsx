@@ -463,6 +463,7 @@ export function ChatPanel({
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "list-branches",
+          githubPat: settings.githubPat,
         }),
       })
       const data = await res.json()

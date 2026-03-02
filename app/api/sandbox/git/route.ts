@@ -89,6 +89,33 @@ export async function POST(req: Request) {
       }
 
       case "list-branches": {
+        // Fetch all remote branches first (single-branch clones only see origin/main)
+        if (githubPat) {
+          const origUrlResult = await sandbox.process.executeCommand(
+            `cd ${repoPath} && git remote get-url origin 2>&1`
+          )
+          const origUrl = origUrlResult.result.trim()
+          // Temporarily set authed URL for private repos
+          const authedUrl = origUrl.replace(
+            /^https:\/\//,
+            `https://x-access-token:${githubPat}@`
+          )
+          await sandbox.process.executeCommand(
+            `cd ${repoPath} && git remote set-url origin '${authedUrl}' 2>&1`
+          )
+          await sandbox.process.executeCommand(
+            `cd ${repoPath} && git fetch origin --prune 2>&1`
+          )
+          // Restore original URL
+          await sandbox.process.executeCommand(
+            `cd ${repoPath} && git remote set-url origin '${origUrl}' 2>&1`
+          )
+        } else {
+          // Best-effort fetch for public repos
+          await sandbox.process.executeCommand(
+            `cd ${repoPath} && git fetch origin --prune 2>&1`
+          )
+        }
         const brResult = await sandbox.process.executeCommand(
           `cd ${repoPath} && git branch -r --format='%(refname:short)' 2>&1`
         )

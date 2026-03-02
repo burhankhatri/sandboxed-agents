@@ -75,13 +75,23 @@ export default function Home() {
     setActiveBranchId(null)
   }
 
-  function handleRemoveRepo(repoId: string) {
+  function handleRemoveRepo(repoId: string): string | null {
+    const repo = repos.find((r) => r.id === repoId)
+    if (!repo) return null
+    // Block removal if there are branches with active sandboxes or messages
+    const hasActiveBranches = repo.branches.some(
+      (b) => b.sandboxId || b.messages.length > 0 || b.status === "running" || b.status === "creating"
+    )
+    if (hasActiveBranches) {
+      return "Cannot remove: this repo has active branches or chat history. Remove all branches first."
+    }
     setRepos((prev) => prev.filter((r) => r.id !== repoId))
     if (activeRepoId === repoId) {
       const remaining = repos.filter((r) => r.id !== repoId)
       setActiveRepoId(remaining[0]?.id ?? null)
       setActiveBranchId(null)
     }
+    return null
   }
 
   const handleAddBranch = useCallback((branch: Branch) => {
@@ -196,6 +206,7 @@ export default function Home() {
           repos={repos}
           activeRepoId={activeRepoId}
           onSelectRepo={handleSelectRepo}
+          onRemoveRepo={handleRemoveRepo}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenAddRepo={() => setAddRepoOpen(true)}
         />

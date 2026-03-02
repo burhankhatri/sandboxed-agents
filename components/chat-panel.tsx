@@ -351,6 +351,7 @@ export function ChatPanel({
 
   const canSend = input.trim() && branch.status !== "running" && branch.status !== "creating" && branch.sandboxId && branch.contextId
   const isReady = branch.sandboxId && branch.contextId && branch.status !== "creating"
+  const isBusy = branch.status === "running" || branch.status === "creating"
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -380,7 +381,7 @@ export function ChatPanel({
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => handleHeaderAction(action.action)}
-                      disabled={!isReady}
+                      disabled={!isReady || (isBusy && action.action !== "log")}
                       className={cn(
                         "flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                         isActive

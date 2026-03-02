@@ -130,7 +130,10 @@ const headerActions = [
 interface ChatPanelProps {
   branch: Branch
   repoFullName: string
+  repoName: string
   settings: Settings
+  gitHistoryOpen: boolean
+  onToggleGitHistory: () => void
   onAddMessage: (message: Message) => void
   onUpdateLastMessage: (updates: Partial<Message>) => void
   onUpdateBranch: (updates: Partial<Branch>) => void
@@ -141,7 +144,10 @@ interface ChatPanelProps {
 export function ChatPanel({
   branch,
   repoFullName,
+  repoName,
   settings,
+  gitHistoryOpen,
+  onToggleGitHistory,
   onAddMessage,
   onUpdateLastMessage,
   onUpdateBranch,
@@ -303,11 +309,14 @@ export function ChatPanel({
   }
 
   function handleHeaderAction(action: string) {
+    if (action === "log") {
+      onToggleGitHistory()
+      return
+    }
     // For actions that make sense, send them as agent messages
     const actionPrompts: Record<string, string> = {
       "create-pr": "Push the current branch to the remote and create a pull request with a descriptive title and body based on the changes made.",
       "diff": "Show me the git diff of all changes made on this branch.",
-      "log": "Show me the git log of recent commits on this branch.",
     }
     const prompt = actionPrompts[action]
     if (prompt && branch.sandboxId && branch.contextId) {
@@ -339,20 +348,28 @@ export function ChatPanel({
           </div>
 
           <div className="ml-auto flex items-center gap-0.5 shrink-0 overflow-x-auto">
-            {headerActions.map((action) => (
-              <Tooltip key={action.label}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleHeaderAction(action.action)}
-                    disabled={!isReady}
-                    className="flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <action.icon className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">{action.label}</TooltipContent>
-              </Tooltip>
-            ))}
+            {headerActions.map((action) => {
+              const isActive = action.action === "log" && gitHistoryOpen
+              return (
+                <Tooltip key={action.label}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleHeaderAction(action.action)}
+                      disabled={!isReady}
+                      className={cn(
+                        "flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                        isActive
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                    >
+                      <action.icon className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">{action.label}</TooltipContent>
+                </Tooltip>
+              )
+            })}
           </div>
         </header>
 

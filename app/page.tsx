@@ -6,6 +6,7 @@ import type { Repo, Branch, Message, Settings, ToolCall } from "@/lib/types"
 import { RepoSidebar } from "@/components/repo-sidebar"
 import { BranchList } from "@/components/branch-list"
 import { ChatPanel, EmptyChatPanel } from "@/components/chat-panel"
+import { GitHistoryPanel } from "@/components/git-history-panel"
 import { SettingsModal } from "@/components/settings-modal"
 import { AddRepoModal } from "@/components/add-repo-modal"
 
@@ -17,6 +18,7 @@ export default function Home() {
   const [branchListWidth, setBranchListWidth] = useState(260)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addRepoOpen, setAddRepoOpen] = useState(false)
+  const [gitHistoryOpen, setGitHistoryOpen] = useState(false)
 
   // Auto-select first repo on load
   useEffect(() => {
@@ -226,7 +228,10 @@ export default function Home() {
             <ChatPanel
               branch={activeBranch}
               repoFullName={`${activeRepo.owner}/${activeRepo.name}`}
+              repoName={activeRepo.name}
               settings={settings}
+              gitHistoryOpen={gitHistoryOpen}
+              onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
               onAddMessage={(msg) => handleAddMessage(activeBranch.id, msg)}
               onUpdateLastMessage={(updates) =>
                 handleUpdateLastMessage(activeBranch.id, updates)
@@ -239,6 +244,16 @@ export default function Home() {
             />
           ) : (
             <EmptyChatPanel hasRepos={repos.length > 0} />
+          )}
+
+          {/* Git history panel */}
+          {gitHistoryOpen && activeBranch?.sandboxId && activeRepo && (
+            <GitHistoryPanel
+              sandboxId={activeBranch.sandboxId}
+              repoName={activeRepo.name}
+              settings={settings}
+              onClose={() => setGitHistoryOpen(false)}
+            />
           )}
         </div>
       </main>

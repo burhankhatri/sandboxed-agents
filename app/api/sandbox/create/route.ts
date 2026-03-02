@@ -42,40 +42,21 @@ export async function POST(req: Request) {
 
         send({ type: "progress", message: "Cloning repository..." })
 
-        const cloneUrl = `https://x-access-token:${githubPat}@github.com/${repoOwner}/${repoName}.git`
-        const cloneResult = await sandbox.process.executeCommand(
-          `cd /home/daytona && git clone ${cloneUrl} 2>&1`
-        )
-        if (cloneResult.exitCode) {
-          throw new Error(`Failed to clone repository: ${cloneResult.result}`)
-        }
-
-        // Set up git config
-        await sandbox.process.executeCommand(
-          `cd /home/daytona/${repoName} && git config user.email "agent@agenthub.dev" && git config user.name "AgentHub"`
-        )
-
-        // Set up git credentials for push
-        await sandbox.process.executeCommand(
-          `echo "https://x-access-token:${githubPat}@github.com" > /home/daytona/.git-credentials && git config --global credential.helper 'store --file /home/daytona/.git-credentials'`
-        )
-
-        // Checkout base branch and create new branch
+        // Use Daytona SDK git interface — never pass PAT to sandbox commands
+        const repoPath = `/home/daytona/${repoName}`
+        const cloneUrl = `https://github.com/${repoOwner}/${repoName}.git`
         const base = baseBranch || "main"
-        send({ type: "progress", message: `Creating branch ${newBranch} from ${base}...` })
+        await sandbox.git.clone(cloneUrl, repoPath, base, undefined, "x-access-token", githubPat)
 
-        const branchResult = await sandbox.process.executeCommand(
-          `cd /home/daytona/${repoName} && git checkout ${base} 2>&1 && git checkout -b ${newBranch} 2>&1`
+        // Set up git author config (no credentials — push goes through SDK)
+        await sandbox.process.executeCommand(
+          `cd ${repoPath} && git config user.email "agent@agenthub.dev" && git config user.name "AgentHub"`
         )
-        if (branchResult.exitCode) {
-          // Try with 'master' if 'main' failed
-          const retryResult = await sandbox.process.executeCommand(
-            `cd /home/daytona/${repoName} && git checkout master 2>&1 && git checkout -b ${newBranch} 2>&1`
-          )
-          if (retryResult.exitCode) {
-            throw new Error(`Failed to create branch: ${branchResult.result}`)
-          }
-        }
+
+        // Create and checkout new branch via Daytona SDK
+        send({ type: "progress", message: `Creating branch ${newBranch} from ${base}...` })
+        await sandbox.git.createBranch(repoPath, newBranch)
+        await sandbox.git.checkoutBranch(repoPath, newBranch)
 
         send({ type: "progress", message: "Installing Claude Agent SDK..." })
 
@@ -95,7 +76,6 @@ export async function POST(req: Request) {
         )
 
         // Create code interpreter context with the repo as working directory
-        const repoPath = `/home/daytona/${repoName}`
         const ctx = await sandbox.codeInterpreter.createContext(repoPath)
 
         // Initialize the coding agent (add /tmp to path so coding_agent.py is found)

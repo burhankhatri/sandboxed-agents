@@ -356,7 +356,7 @@ export function ChatPanel({
           })
         } catch {}
       }
-      onUpdateBranch({ status: "idle", lastActivity: "now" })
+      onUpdateBranch({ status: "idle", lastActivity: "now", lastActivityTs: Date.now() })
       abortControllerRef.current = null
       onForceSave()
     }

@@ -22,6 +22,7 @@ export interface Branch {
   messages: Message[]
   status: "idle" | "running" | "creating" | "error"
   lastActivity: string
+  lastActivityTs?: number
   unread?: boolean
   sandboxId?: string
   contextId?: string

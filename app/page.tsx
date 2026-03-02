@@ -189,6 +189,7 @@ export default function Home() {
               ...b,
               messages: [...b.messages, message],
               lastActivity: "now",
+              lastActivityTs: Date.now(),
             }
           }),
         }

@@ -85,9 +85,9 @@ export function BranchList({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const newBranchInputRef = useRef<HTMLInputElement>(null)
 
-  const filtered = repo.branches.filter((b) =>
-    b.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = repo.branches
+    .filter((b) => b.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (b.lastActivityTs ?? 0) - (a.lastActivityTs ?? 0))
 
   const activeBranch = activeBranchId
     ? repo.branches.find((b) => b.id === activeBranchId)
@@ -184,6 +184,7 @@ export function BranchList({
       messages: [],
       status: "creating",
       lastActivity: "now",
+      lastActivityTs: Date.now(),
       baseBranch: newBranchBase,
     }
 

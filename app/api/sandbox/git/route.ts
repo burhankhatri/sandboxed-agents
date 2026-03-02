@@ -57,16 +57,10 @@ export async function POST(req: Request) {
           }
           committed = true
         }
-        // Check if there are commits to push (agent may have committed during its turn)
-        const unpushed = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git log @{u}..HEAD --oneline 2>&1`
-        )
-        const hasUnpushed = !unpushed.exitCode && unpushed.result.trim().length > 0
-        if (committed || hasUnpushed) {
-          await sandbox.git.push(repoPath, "x-access-token", githubPat)
-          return Response.json({ committed, pushed: true })
-        }
-        return Response.json({ committed: false, pushed: false })
+        // Always push — covers agent-made commits AND new branches with no upstream.
+        // Daytona SDK push is safe to call even if there's nothing new to push.
+        await sandbox.git.push(repoPath, "x-access-token", githubPat)
+        return Response.json({ committed, pushed: true })
       }
 
       case "push": {

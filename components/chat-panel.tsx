@@ -333,19 +333,54 @@ export function ChatPanel({
     }
   }
 
-  function handleHeaderAction(action: string) {
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  function addSystemMessage(content: string) {
+    onAddMessage({
+      id: generateId(),
+      role: "assistant",
+      content,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    })
+  }
+
+  async function handleCreatePR() {
+    if (!settings.githubPat) {
+      addSystemMessage("GitHub PAT required to create a PR. Configure it in Settings.")
+      return
+    }
+    const [owner, repo] = repoFullName.split("/")
+    setActionLoading("create-pr")
+    try {
+      const res = await fetch("/api/github/pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: settings.githubPat,
+          owner,
+          repo,
+          head: branch.name,
+          base: branch.baseBranch,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      addSystemMessage(`Pull request created: [${data.title} #${data.number}](${data.url})`)
+    } catch (err: unknown) {
+      addSystemMessage(`Failed to create PR: ${err instanceof Error ? err.message : "Unknown error"}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleHeaderAction(action: string) {
     if (action === "log") {
       onToggleGitHistory()
       return
     }
-    // For actions that make sense, send them as agent messages
-    const actionPrompts: Record<string, string> = {
-      "create-pr": "Push the current branch to the remote and create a pull request with a descriptive title and body based on the changes made.",
-      "diff": "Show me the git diff of all changes made on this branch.",
-    }
-    const prompt = actionPrompts[action]
-    if (prompt && branch.sandboxId && branch.contextId) {
-      setInput(prompt)
+    if (action === "create-pr") {
+      handleCreatePR()
+      return
     }
   }
 

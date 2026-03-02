@@ -19,6 +19,26 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addRepoOpen, setAddRepoOpen] = useState(false)
   const [gitHistoryOpen, setGitHistoryOpen] = useState(false)
+  const [githubUser, setGithubUser] = useState<string | null>(null)
+  const [userAvatar, setUserAvatar] = useState<string | null>(null)
+
+  // Fetch GitHub user info when PAT is set
+  useEffect(() => {
+    if (!settings.githubPat) {
+      setGithubUser(null)
+      setUserAvatar(null)
+      return
+    }
+    fetch(`/api/github/user?token=${settings.githubPat}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.login) {
+          setGithubUser(data.login)
+          setUserAvatar(data.avatar || null)
+        }
+      })
+      .catch(() => {})
+  }, [settings.githubPat])
 
   // Auto-select first repo on load
   useEffect(() => {
@@ -205,6 +225,7 @@ export default function Home() {
         <RepoSidebar
           repos={repos}
           activeRepoId={activeRepoId}
+          userAvatar={userAvatar}
           onSelectRepo={handleSelectRepo}
           onRemoveRepo={handleRemoveRepo}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -279,6 +300,7 @@ export default function Home() {
         open={addRepoOpen}
         onClose={() => setAddRepoOpen(false)}
         settings={settings}
+        githubUser={githubUser}
         onAddRepo={handleAddRepo}
       />
     </>

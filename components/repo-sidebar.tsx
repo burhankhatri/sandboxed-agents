@@ -49,7 +49,10 @@ export function RepoSidebar({
         {repos.map((repo, index) => {
           const isActive = repo.id === activeRepoId
           const hasRunning = repo.branches.some((b) => b.status === "running" || b.status === "creating")
-          const initials = (repo.owner[0] + repo.name[0]).toUpperCase()
+          const nameParts = repo.name.split("-")
+          const initials = nameParts.length > 1
+            ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
+            : repo.name.slice(0, 2).toUpperCase()
           return (
             <div
               key={repo.id}

@@ -94,9 +94,7 @@ export function BranchList({
   const [newBranchOpen, setNewBranchOpen] = useState(false)
   const [newBranchName, setNewBranchName] = useState("")
   const [branchPlaceholder, setBranchPlaceholder] = useState(() => randomBranchName())
-  const [newBranchBase, setNewBranchBase] = useState(
-    (activeBranchId && repo.branches.find((b) => b.id === activeBranchId)?.name) || repo.defaultBranch || "main"
-  )
+  const [newBranchBase, setNewBranchBase] = useState(repo.defaultBranch || "main")
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [startCommit, setStartCommit] = useState<string | null>(null)
@@ -442,9 +440,7 @@ export function BranchList({
             onClick={() => {
               setNewBranchOpen(true)
               setBranchPlaceholder(randomBranchName())
-              setNewBranchBase(
-                (activeBranchId && repo.branches.find((b) => b.id === activeBranchId)?.name) || repo.defaultBranch || "main"
-              )
+              setNewBranchBase(repo.defaultBranch || "main")
             }}
             className="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >

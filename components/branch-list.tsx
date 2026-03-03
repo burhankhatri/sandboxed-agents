@@ -49,6 +49,14 @@ function StatusDot({ branch, isActive }: { branch: Branch; isActive: boolean }) 
     )
   }
 
+  if (branch.unread && !isActive) {
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+        <span className="h-2 w-2 rounded-full bg-foreground" />
+      </span>
+    )
+  }
+
   if (branch.status === "error") {
     return (
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -61,14 +69,6 @@ function StatusDot({ branch, isActive }: { branch: Branch; isActive: boolean }) 
     return (
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
         <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
-      </span>
-    )
-  }
-
-  if (branch.unread && !isActive) {
-    return (
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-        <span className="h-2 w-2 rounded-full bg-foreground" />
       </span>
     )
   }

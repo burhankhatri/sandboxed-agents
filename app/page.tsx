@@ -160,7 +160,12 @@ export default function Home() {
           ...r,
           branches: r.branches.map((b) => {
             if (b.id !== branchId) return b
-            return { ...b, ...updates }
+            const merged = { ...b, ...updates }
+            // Mark as unread when agent finishes on a non-active branch
+            if (updates.status === "idle" && b.status === "running" && branchId !== activeBranchIdRef.current) {
+              merged.unread = true
+            }
+            return merged
           }),
         }
       })

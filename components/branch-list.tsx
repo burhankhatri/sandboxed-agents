@@ -98,6 +98,8 @@ export function BranchList({
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [startCommit, setStartCommit] = useState<string | null>(null)
+  const [githubBranches, setGithubBranches] = useState<string[]>([])
+  const [githubBranchesLoading, setGithubBranchesLoading] = useState(false)
   const isResizing = useRef(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const newBranchInputRef = useRef<HTMLInputElement>(null)
@@ -145,6 +147,22 @@ export function BranchList({
     }
   }, [newBranchOpen])
 
+  const fetchGithubBranches = useCallback(async () => {
+    if (!settings.githubPat) return
+    setGithubBranchesLoading(true)
+    try {
+      const res = await fetch(
+        `/api/github/branches?token=${encodeURIComponent(settings.githubPat)}&owner=${encodeURIComponent(repo.owner)}&repo=${encodeURIComponent(repo.name)}`
+      )
+      const data = await res.json()
+      setGithubBranches(data.branches || [])
+    } catch {
+      setGithubBranches([])
+    } finally {
+      setGithubBranchesLoading(false)
+    }
+  }, [settings.githubPat, repo.owner, repo.name])
+
   // Open new branch dialog when a commit is selected from git history
   useEffect(() => {
     if (pendingStartCommit) {
@@ -152,8 +170,9 @@ export function BranchList({
       setBranchPlaceholder(randomBranchName())
       setStartCommit(pendingStartCommit)
       onClearPendingCommit?.()
+      fetchGithubBranches()
     }
-  }, [pendingStartCommit, onClearPendingCommit])
+  }, [pendingStartCommit, onClearPendingCommit, fetchGithubBranches])
 
   const [deleteModalBranchId, setDeleteModalBranchId] = useState<string | null>(null)
   const deleteModalBranch = deleteModalBranchId ? repo.branches.find((b) => b.id === deleteModalBranchId) : null
@@ -417,12 +436,17 @@ export function BranchList({
                   value={newBranchBase}
                   onChange={(e) => setNewBranchBase(e.target.value)}
                   className="bg-secondary rounded px-1.5 py-0.5 text-[11px] text-foreground border border-border"
-                  disabled={creating}
+                  disabled={creating || githubBranchesLoading}
                 >
-                  <option value={repo.defaultBranch || "main"}>{repo.defaultBranch || "main"}</option>
-                  {repo.branches.map((b) => (
-                    <option key={b.id} value={b.name}>{b.name}</option>
-                  ))}
+                  {githubBranchesLoading ? (
+                    <option>Loading...</option>
+                  ) : githubBranches.length > 0 ? (
+                    githubBranches.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))
+                  ) : (
+                    <option value={repo.defaultBranch || "main"}>{repo.defaultBranch || "main"}</option>
+                  )}
                 </select>
               )}
             </div>
@@ -446,6 +470,7 @@ export function BranchList({
               setNewBranchOpen(true)
               setBranchPlaceholder(randomBranchName())
               setNewBranchBase(repo.defaultBranch || "main")
+              fetchGithubBranches()
             }}
             className="flex w-full cursor-pointer items-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >

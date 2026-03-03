@@ -563,17 +563,9 @@ export function ChatPanel({
   async function fetchBranches() {
     setBranchesLoading(true)
     try {
-      const res = await fetch("/api/sandbox/git", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
-          sandboxId: branch.sandboxId,
-          repoPath: `/home/daytona/${repoName}`,
-          action: "list-branches",
-          githubPat: settings.githubPat,
-        }),
-      })
+      const res = await fetch(
+        `/api/github/branches?token=${encodeURIComponent(settings.githubPat)}&owner=${encodeURIComponent(repoOwner)}&repo=${encodeURIComponent(repoName)}`
+      )
       const data = await res.json()
       const branches = (data.branches || []).filter((b: string) => b !== branch.name)
       setRemoteBranches(branches)

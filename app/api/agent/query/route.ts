@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
       try {
         // Use resume helper to ensure sandbox + agent are ready
-        const { sandbox, contextId: activeContextId, wasResumed } = await ensureSandboxReady(
+        const { sandbox, contextId: activeContextId, wasResumed, resumeSessionId } = await ensureSandboxReady(
           daytonaApiKey,
           sandboxId,
           repoName || "repo",
@@ -68,7 +68,11 @@ export async function POST(req: Request) {
           `coding_agent.run_query_sync(os.environ.get('PROMPT', ''))`,
           {
             context: ctx,
-            envs: { PROMPT: prompt, ...(previewUrlPattern ? { PREVIEW_URL_PATTERN: previewUrlPattern } : {}) },
+            envs: {
+              PROMPT: prompt,
+              ...(previewUrlPattern ? { PREVIEW_URL_PATTERN: previewUrlPattern } : {}),
+              ...(resumeSessionId ? { RESUME_SESSION_ID: resumeSessionId } : {}),
+            },
             onStdout: (msg) => {
               const text = msg.output
               // Parse SESSION_ID: prefix from agent stdout

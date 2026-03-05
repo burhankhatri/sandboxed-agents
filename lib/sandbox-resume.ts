@@ -30,7 +30,18 @@ export async function ensureSandboxReady(
     try {
       const contexts = await sandbox.codeInterpreter.listContexts()
       if (contexts.length > 0) {
-        return { sandbox, contextId: contexts[0].id, wasResumed: false }
+        let resumeSessionId: string | undefined
+        try {
+          const result = await sandbox.process.executeCommand(
+            "cat /home/daytona/.agent_session_id 2>/dev/null"
+          )
+          if (!result.exitCode && result.result.trim()) {
+            resumeSessionId = result.result.trim()
+          }
+        } catch {
+          // ignore
+        }
+        return { sandbox, contextId: contexts[0].id, wasResumed: false, resumeSessionId }
       }
     } catch {
       // Context listing failed — fall through to re-create

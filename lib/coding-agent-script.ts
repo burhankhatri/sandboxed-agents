@@ -1,4 +1,5 @@
 // Python coding agent script that runs inside the Daytona sandbox.
+
 // This is uploaded to the sandbox and executed via the code interpreter.
 // Note: \\n in the template literal becomes \n in the output string,
 // which Python interprets as a newline character in string literals.
@@ -42,15 +43,15 @@ Replace {port} with the actual port number. For example, if you start a server o
 """
 
 resume_session = os.environ.get('RESUME_SESSION_ID', '')
-opts = ClaudeAgentOptions(
+opts_kwargs = dict(
     allowed_tools=["Read", "Edit", "Write", "Glob", "Grep", "Bash"],
     permission_mode="bypassPermissions",
     system_prompt=system_prompt,
 )
 if resume_session:
-    opts.resume = resume_session
+    opts_kwargs['resume'] = resume_session
 
-client = ClaudeSDKClient(options=opts)
+client = ClaudeSDKClient(options=ClaudeAgentOptions(**opts_kwargs))
 
 async def init_client():
     await client.__aenter__()
@@ -61,10 +62,11 @@ run_sync(init_client())
 async def run_query(prompt):
     await client.query(prompt)
     async for message in client.receive_response():
-        if hasattr(message, 'type') and getattr(message, 'type', '') == 'system':
-            if getattr(message, 'subtype', '') == 'init':
-                sid = getattr(message, 'session_id', None) or (getattr(message, 'data', {}) or {}).get('session_id')
-                if sid:
+        # First message is system init with session_id (same as SDK docs: subtype == "init", session_id in message.data)
+        if hasattr(message, 'subtype') and getattr(message, 'subtype', '') == 'init':
+            data = getattr(message, 'data', None) or {}
+            sid = data.get('session_id') if isinstance(data, dict) else None
+            if sid:
                     sys.stdout.write("SESSION_ID:" + sid + "\\n")
                     sys.stdout.flush()
                     with open('/home/daytona/.agent_session_id', 'w') as f:

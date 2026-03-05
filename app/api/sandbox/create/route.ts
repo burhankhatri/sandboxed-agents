@@ -73,9 +73,9 @@ export async function POST(req: Request) {
         const base = baseBranch || "main"
         await sandbox.git.clone(cloneUrl, repoPath, base, undefined, "x-access-token", githubPat)
 
-        // Set up git author config from GitHub user (fallback to AgentHub)
-        let gitName = "AgentHub"
-        let gitEmail = "agent@agenthub.dev"
+        // Set up git author config from GitHub user (fallback to Sandboxed Agent)
+        let gitName = "Sandboxed Agent"
+        let gitEmail = "noreply@example.com"
         try {
           const ghRes = await fetch("https://api.github.com/user", {
             headers: { Authorization: `Bearer ${githubPat}`, Accept: "application/vnd.github.v3+json" },

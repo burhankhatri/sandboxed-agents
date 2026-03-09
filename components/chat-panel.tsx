@@ -300,14 +300,11 @@ export function ChatPanel({
     }
   }, [input])
 
-  // Save draft prompt to branch (debounced)
+  // Save draft prompt to branch
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (input !== (branch.draftPrompt ?? "")) {
-        onUpdateBranch({ draftPrompt: input })
-      }
-    }, 300)
-    return () => clearTimeout(timeout)
+    if (input !== (branch.draftPrompt ?? "")) {
+      onUpdateBranch({ draftPrompt: input })
+    }
   }, [input, branch.draftPrompt, onUpdateBranch])
 
   const handleSend = useCallback(async () => {

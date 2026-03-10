@@ -151,5 +151,23 @@ model Message {
 
   createdAt DateTime @default(now())
 
+  execution AgentExecution?
+
   @@index([branchId, createdAt])
+}
+
+// Tracks background agent executions that survive browser close
+model AgentExecution {
+  id        String @id @default(cuid())
+  messageId String @unique
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  sandboxId   String
+  executionId String @unique // Used to identify the output file in sandbox
+
+  status      String   @default("running") // "running" | "completed" | "error"
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([sandboxId, status])
 }

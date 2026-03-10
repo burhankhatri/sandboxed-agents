@@ -8,5 +8,10 @@ node_modules/
 .next/
 .env
 .env*.local
+.env
 .DS_Store
 /lib/generated/prisma
+
+# Build artifacts
+tsconfig.tsbuildinfo
+next-env.d.ts

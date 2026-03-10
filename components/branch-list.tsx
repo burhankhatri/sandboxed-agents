@@ -420,7 +420,10 @@ export function BranchList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className={cn(
+        "flex-1 overflow-y-auto px-2",
+        isMobile ? "pb-2" : "pb-2"
+      )}>
         {filtered.length === 0 && repo.branches.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
             <GitBranch className="h-5 w-5" />
@@ -479,7 +482,10 @@ export function BranchList({
 
       {/* New Branch Section */}
       {newBranchOpen ? (
-        <div className="border-t border-border p-3">
+        <div
+          className="border-t border-border p-3"
+          style={isMobile ? { paddingBottom: 'calc(3.75rem + var(--safe-area-inset-bottom) + 0.75rem)' } : undefined}
+        >
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">New branch</span>
@@ -557,7 +563,10 @@ export function BranchList({
           </div>
         </div>
       ) : (
-        <div className="border-t border-border p-3">
+        <div
+          className="border-t border-border p-3"
+          style={isMobile ? { paddingBottom: 'calc(3.75rem + var(--safe-area-inset-bottom) + 0.75rem)' } : undefined}
+        >
           <button
             onClick={() => {
               setNewBranchOpen(true)

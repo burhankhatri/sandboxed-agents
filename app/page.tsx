@@ -11,7 +11,11 @@ import { ChatPanel, EmptyChatPanel } from "@/components/chat-panel"
 import { GitHistoryPanel } from "@/components/git-history-panel"
 import { SettingsModal } from "@/components/settings-modal"
 import { AddRepoModal } from "@/components/add-repo-modal"
-import { Loader2, ChevronLeft, GitBranch } from "lucide-react"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { MobileHeader } from "@/components/mobile-header"
+import { MobileSidebarDrawer } from "@/components/mobile-sidebar-drawer"
+import { DiffModal } from "@/components/diff-modal"
+import { Loader2, GitBranch } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 // Types for database models
@@ -126,6 +130,12 @@ export default function Home() {
   const [gitHistoryOpen, setGitHistoryOpen] = useState(false)
   const [gitHistoryRefreshTrigger, setGitHistoryRefreshTrigger] = useState(0)
   const [pendingStartCommit, setPendingStartCommit] = useState<string | null>(null)
+
+  // Mobile-specific state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [mobileSandboxToggleLoading, setMobileSandboxToggleLoading] = useState(false)
+  const [mobilePrLoading, setMobilePrLoading] = useState(false)
+  const [mobileDiffOpen, setMobileDiffOpen] = useState(false)
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -502,6 +512,60 @@ export default function Home() {
       .catch(() => {})
   }, [])
 
+  // Mobile-specific handlers
+  const handleMobileSandboxToggle = useCallback(async () => {
+    if (!activeBranch?.sandboxId || mobileSandboxToggleLoading) return
+    const isStopped = activeBranch.status === "stopped"
+    setMobileSandboxToggleLoading(true)
+    try {
+      const res = await fetch("/api/sandbox/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sandboxId: activeBranch.sandboxId,
+          action: isStopped ? "start" : "stop",
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      handleUpdateBranch(activeBranch.id, { status: isStopped ? "idle" : "stopped" })
+    } catch {
+      // ignore
+    } finally {
+      setMobileSandboxToggleLoading(false)
+    }
+  }, [activeBranch, mobileSandboxToggleLoading, handleUpdateBranch])
+
+  const handleMobileCreatePR = useCallback(async () => {
+    if (!activeBranch || !activeRepo) return
+    // If PR already exists, just open it
+    if (activeBranch.prUrl) {
+      window.open(activeBranch.prUrl, "_blank")
+      return
+    }
+    setMobilePrLoading(true)
+    try {
+      const res = await fetch("/api/github/pr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: activeRepo.owner,
+          repo: activeRepo.name,
+          head: activeBranch.name,
+          base: activeBranch.baseBranch,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      handleUpdateBranch(activeBranch.id, { prUrl: data.url })
+      window.open(data.url, "_blank")
+    } catch {
+      // Silently fail
+    } finally {
+      setMobilePrLoading(false)
+    }
+  }, [activeBranch, activeRepo, handleUpdateBranch])
+
   // Loading state
   if (status === "loading" || !loaded) {
     return (
@@ -523,28 +587,49 @@ export default function Home() {
   return (
     <>
       <main className="flex h-dvh overflow-hidden">
-        {/* Repo Sidebar - always visible */}
-        <RepoSidebar
-          repos={repos}
-          activeRepoId={activeRepoId}
-          userAvatar={session?.user?.image || null}
-          userName={session?.user?.name || null}
-          userLogin={session?.user?.githubLogin || null}
-          onSelectRepo={handleSelectRepo}
-          onRemoveRepo={handleRemoveRepo}
-          onReorderRepos={(from, to) => {
-            setRepos((prev) => {
-              const next = [...prev]
-              const [moved] = next.splice(from, 1)
-              next.splice(to, 0, moved)
-              return next
-            })
-          }}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onOpenAddRepo={() => setAddRepoOpen(true)}
-          onSignOut={() => signOut({ callbackUrl: "/login" })}
-          quota={quota}
-        />
+        {/* Repo Sidebar - desktop only */}
+        {!isMobile && (
+          <RepoSidebar
+            repos={repos}
+            activeRepoId={activeRepoId}
+            userAvatar={session?.user?.image || null}
+            userName={session?.user?.name || null}
+            userLogin={session?.user?.githubLogin || null}
+            onSelectRepo={handleSelectRepo}
+            onRemoveRepo={handleRemoveRepo}
+            onReorderRepos={(from, to) => {
+              setRepos((prev) => {
+                const next = [...prev]
+                const [moved] = next.splice(from, 1)
+                next.splice(to, 0, moved)
+                return next
+              })
+            }}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenAddRepo={() => setAddRepoOpen(true)}
+            onSignOut={() => signOut({ callbackUrl: "/login" })}
+            quota={quota}
+          />
+        )}
+
+        {/* Mobile Sidebar Drawer */}
+        {isMobile && (
+          <MobileSidebarDrawer
+            open={mobileSidebarOpen}
+            onOpenChange={setMobileSidebarOpen}
+            repos={repos}
+            activeRepoId={activeRepoId}
+            userAvatar={session?.user?.image || null}
+            userName={session?.user?.name || null}
+            userLogin={session?.user?.githubLogin || null}
+            onSelectRepo={handleSelectRepo}
+            onRemoveRepo={handleRemoveRepo}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenAddRepo={() => setAddRepoOpen(true)}
+            onSignOut={() => signOut({ callbackUrl: "/login" })}
+            quota={quota}
+          />
+        )}
 
         {/* Desktop: Branch List (always visible) */}
         <div className="hidden sm:flex">
@@ -573,90 +658,86 @@ export default function Home() {
           )}
         </div>
 
-        {/* Mobile: Branch List (fullscreen, shown when mobileView === "branches") */}
-        {isMobile && mobileView === "branches" && (
-          <div className="flex flex-1 flex-col sm:hidden">
-            {activeRepo ? (
-              <BranchList
-                repo={activeRepo}
-                activeBranchId={activeBranchId}
-                onSelectBranch={handleSelectBranch}
-                onAddBranch={handleAddBranch}
-                onRemoveBranch={handleRemoveBranch}
-                onUpdateBranch={handleUpdateBranch}
-                onQuotaRefresh={handleQuotaRefresh}
-                width="100%"
-                onWidthChange={() => {}}
-                pendingStartCommit={pendingStartCommit}
-                onClearPendingCommit={() => setPendingStartCommit(null)}
-                quota={quota}
-                isMobile={true}
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center bg-card text-muted-foreground px-4">
-                <GitBranch className="h-8 w-8 mb-3 text-muted-foreground/50" />
-                <p className="text-sm text-center">Add a repository to get started</p>
-                <p className="text-xs text-muted-foreground/60 mt-1 text-center">
-                  Tap the + button in the sidebar
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Mobile: Full layout with header, content, and bottom nav */}
+        {isMobile && (
+          <div className="flex flex-1 flex-col min-h-0 overflow-hidden sm:hidden">
+            {/* Mobile Header */}
+            <MobileHeader
+              repoOwner={activeRepo?.owner || null}
+              repoName={activeRepo?.name || null}
+              branch={activeBranch}
+              onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
+              onOpenDiff={() => setMobileDiffOpen(true)}
+              onCreatePR={handleMobileCreatePR}
+              onSandboxToggle={handleMobileSandboxToggle}
+              gitHistoryOpen={gitHistoryOpen}
+              sandboxToggleLoading={mobileSandboxToggleLoading}
+              prLoading={mobilePrLoading}
+            />
 
-        {/* Mobile: Chat Panel (fullscreen, shown when mobileView === "chat") */}
-        {isMobile && mobileView === "chat" && (
-          <div className="flex min-w-0 flex-1 flex-col sm:hidden overflow-hidden">
-            {/* Mobile header with back button */}
-            <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2">
-              <button
-                onClick={() => setMobileView("branches")}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              {activeRepo && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs text-muted-foreground truncate">
-                    {activeRepo.owner}/{activeRepo.name}
-                  </span>
-                  {activeBranch && (
-                    <>
-                      <span className="text-muted-foreground/30">/</span>
-                      <span className="text-xs font-medium text-foreground truncate">
-                        {activeBranch.name}
-                      </span>
-                    </>
-                  )}
-                </div>
+            {/* Content area - branches or chat based on mobileView */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {mobileView === "branches" ? (
+                activeRepo ? (
+                  <BranchList
+                    repo={activeRepo}
+                    activeBranchId={activeBranchId}
+                    onSelectBranch={handleSelectBranch}
+                    onAddBranch={handleAddBranch}
+                    onRemoveBranch={handleRemoveBranch}
+                    onUpdateBranch={handleUpdateBranch}
+                    onQuotaRefresh={handleQuotaRefresh}
+                    width="100%"
+                    onWidthChange={() => {}}
+                    pendingStartCommit={pendingStartCommit}
+                    onClearPendingCommit={() => setPendingStartCommit(null)}
+                    quota={quota}
+                    isMobile={true}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center bg-card text-muted-foreground px-4">
+                    <GitBranch className="h-8 w-8 mb-3 text-muted-foreground/50" />
+                    <p className="text-sm text-center">Add a repository to get started</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1 text-center">
+                      Tap Repos in the bottom nav to add one
+                    </p>
+                  </div>
+                )
+              ) : (
+                activeBranch && activeRepo ? (
+                  <ChatPanel
+                    branch={activeBranch}
+                    repoFullName={`${activeRepo.owner}/${activeRepo.name}`}
+                    repoName={activeRepo.name}
+                    repoOwner={activeRepo.owner}
+                    gitHistoryOpen={gitHistoryOpen}
+                    onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
+                    onAddMessage={(msg) => handleAddMessage(activeBranch.id, msg)}
+                    onUpdateMessage={(messageId, updates) =>
+                      handleUpdateMessage(activeBranch.id, messageId, updates)
+                    }
+                    onUpdateBranch={(updates) =>
+                      handleUpdateBranch(activeBranch.id, updates)
+                    }
+                    onSaveDraftForBranch={handleSaveDraftForBranch}
+                    onForceSave={() => {}}
+                    onCommitsDetected={() => setGitHistoryRefreshTrigger((n) => n + 1)}
+                    onBranchFromCommit={(hash) => setPendingStartCommit(hash)}
+                    isMobile={true}
+                  />
+                ) : (
+                  <EmptyChatPanel hasRepos={repos.length > 0} />
+                )
               )}
             </div>
-            {activeBranch && activeRepo ? (
-              <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-                <ChatPanel
-                branch={activeBranch}
-                repoFullName={`${activeRepo.owner}/${activeRepo.name}`}
-                repoName={activeRepo.name}
-                repoOwner={activeRepo.owner}
-                gitHistoryOpen={gitHistoryOpen}
-                onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
-                onAddMessage={(msg) => handleAddMessage(activeBranch.id, msg)}
-                onUpdateMessage={(messageId, updates) =>
-                  handleUpdateMessage(activeBranch.id, messageId, updates)
-                }
-                onUpdateBranch={(updates) =>
-                  handleUpdateBranch(activeBranch.id, updates)
-                }
-                onSaveDraftForBranch={handleSaveDraftForBranch}
-                onForceSave={() => {}}
-                onCommitsDetected={() => setGitHistoryRefreshTrigger((n) => n + 1)}
-                onBranchFromCommit={(hash) => setPendingStartCommit(hash)}
-                isMobile={true}
-              />
-              </div>
-            ) : (
-              <EmptyChatPanel hasRepos={repos.length > 0} />
-            )}
+
+            {/* Bottom Navigation */}
+            <MobileBottomNav
+              activeView={mobileView}
+              onViewChange={setMobileView}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+              hasActiveChat={!!activeBranch}
+            />
           </div>
         )}
 
@@ -716,6 +797,18 @@ export default function Home() {
         onAddRepo={handleAddRepo}
         onSelectExistingRepo={handleSelectRepo}
       />
+
+      {/* Mobile Diff Modal */}
+      {isMobile && activeRepo && activeBranch && (
+        <DiffModal
+          open={mobileDiffOpen}
+          onClose={() => setMobileDiffOpen(false)}
+          repoOwner={activeRepo.owner}
+          repoName={activeRepo.name}
+          branchName={activeBranch.name}
+          baseBranch={activeBranch.baseBranch || activeRepo.defaultBranch}
+        />
+      )}
     </>
   )
 }

@@ -179,6 +179,32 @@ export function BranchList({
   const [isDeleting, setIsDeleting] = useState(false)
   const deleteModalBranch = deleteModalBranchId ? repo.branches.find((b) => b.id === deleteModalBranchId) : null
 
+  // Handle delete button click - check if branch exists on GitHub first
+  const handleDeleteClick = useCallback(async (branchId: string) => {
+    const branch = repo.branches.find((b) => b.id === branchId)
+    if (!branch) return
+
+    // Check if branch exists on GitHub
+    try {
+      const baseBranch = branch.baseBranch || repo.defaultBranch || "main"
+      const res = await fetch(
+        `/api/github/check-merged?owner=${encodeURIComponent(repo.owner)}&repo=${encodeURIComponent(repo.name)}&branch=${encodeURIComponent(branch.name)}&baseBranch=${encodeURIComponent(baseBranch)}`
+      )
+      const data = await res.json()
+
+      // If branch doesn't exist on GitHub, delete immediately without modal
+      if (res.ok && data.notFound) {
+        onRemoveBranch(branchId, false)
+        return
+      }
+    } catch {
+      // On error, fall through to show modal
+    }
+
+    // Branch exists on GitHub (or we couldn't check), show the modal
+    setDeleteModalBranchId(branchId)
+  }, [repo.branches, repo.owner, repo.name, repo.defaultBranch, onRemoveBranch])
+
   // Check if branch is merged when delete modal opens
   useEffect(() => {
     if (!deleteModalBranchId || !deleteModalBranch) return
@@ -194,16 +220,11 @@ export function BranchList({
         )
         const data = await res.json()
         if (res.ok) {
-          // If branch not found on remote, treat as unmerged (local only)
-          if (data.notFound) {
-            setDeleteModalMergeStatus("unmerged")
-          } else {
-            const isMerged = data.isMerged
-            setDeleteModalMergeStatus(isMerged ? "merged" : "unmerged")
-            // Default to checking the delete on GitHub option if branch is merged
-            if (isMerged) {
-              setDeleteRemoteChecked(true)
-            }
+          const isMerged = data.isMerged
+          setDeleteModalMergeStatus(isMerged ? "merged" : "unmerged")
+          // Default to checking the delete on GitHub option if branch is merged
+          if (isMerged) {
+            setDeleteRemoteChecked(true)
           }
         } else {
           setDeleteModalMergeStatus("error")
@@ -401,7 +422,7 @@ export function BranchList({
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      setDeleteModalBranchId(branch.id)
+                      handleDeleteClick(branch.id)
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-all hover:bg-muted-foreground/10 hover:text-foreground"
                   >

@@ -147,11 +147,17 @@ export async function POST(req: Request) {
           send({ type: "error", message: result.error.value })
         }
 
-        // Update sandbox status back to idle
+        // Update sandbox and branch status back to idle
         await prisma.sandbox.update({
           where: { id: sandboxRecord.id },
-          data: { status: "running" },
+          data: { status: "idle" },
         })
+        if (sandboxRecord.branch) {
+          await prisma.branch.update({
+            where: { id: sandboxRecord.branch.id },
+            data: { status: "idle" },
+          })
+        }
 
         send({ type: "done" })
       } catch (error: unknown) {

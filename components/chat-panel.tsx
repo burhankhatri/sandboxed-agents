@@ -245,9 +245,13 @@ export function ChatPanel({
     }
   }, [branch.id, branch.draftPrompt])
 
-  // Check sandbox status on mount — detect stopped sandboxes
+  // Check sandbox status on mount — detect stopped sandboxes and recover from stuck "running" state
   useEffect(() => {
-    if (!branch.sandboxId || branch.status !== "idle") return
+    if (!branch.sandboxId) return
+
+    // Skip if we're the ones actively running a query (abortControllerRef is set)
+    if (abortControllerRef.current) return
+
     fetch("/api/sandbox/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -258,7 +262,13 @@ export function ChatPanel({
       .then((r) => r.json())
       .then((data) => {
         if (data.state && data.state !== "started") {
+          // Sandbox is stopped
           onUpdateBranch({ status: "stopped" })
+        } else if (branch.status === "running" && !abortControllerRef.current) {
+          // Branch shows "running" but we have no active SSE connection - this is a stale state
+          // This happens when the browser was closed while agent was processing
+          // Reset to idle so the user can send new messages
+          onUpdateBranch({ status: "idle" })
         }
       })
       .catch(() => {})

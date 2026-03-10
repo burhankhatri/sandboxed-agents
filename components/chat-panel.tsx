@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { Branch, Message, ToolCall, Settings } from "@/lib/types"
+import type { Branch, Message, ToolCall } from "@/lib/types"
 import { agentLabels } from "@/lib/types"
 import { generateId } from "@/lib/store"
 import {
@@ -199,7 +199,6 @@ interface ChatPanelProps {
   repoFullName: string
   repoName: string
   repoOwner: string
-  settings: Settings
   gitHistoryOpen: boolean
   onToggleGitHistory: () => void
   onAddMessage: (message: Message) => void
@@ -215,7 +214,6 @@ export function ChatPanel({
   repoFullName,
   repoName,
   repoOwner,
-  settings,
   gitHistoryOpen,
   onToggleGitHistory,
   onAddMessage,
@@ -242,7 +240,6 @@ export function ChatPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        daytonaApiKey: settings.daytonaApiKey,
         sandboxId: branch.sandboxId,
       }),
     })
@@ -253,7 +250,7 @@ export function ChatPanel({
         }
       })
       .catch(() => {})
-  }, [branch.id, branch.sandboxId, branch.status, settings.daytonaApiKey, onUpdateBranch])
+  }, [branch.id, branch.sandboxId, branch.status, onUpdateBranch])
 
   // Populate baseline known commits on mount / branch change
   useEffect(() => {
@@ -263,7 +260,6 @@ export function ChatPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        daytonaApiKey: settings.daytonaApiKey,
         sandboxId: branch.sandboxId,
         repoPath: `/home/daytona/${repoName}`,
         action: "log",
@@ -275,7 +271,7 @@ export function ChatPanel({
         knownCommitsRef.current = new Set(commits.map((c: { shortHash: string }) => c.shortHash))
       })
       .catch(() => {})
-  }, [branch.id, branch.sandboxId, settings.daytonaApiKey, repoName])
+  }, [branch.id, branch.sandboxId, repoName])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -295,16 +291,6 @@ export function ChatPanel({
     const prompt = input.trim()
     if (!prompt || branch.status === "running" || branch.status === "creating") return
     if (!branch.sandboxId) return
-
-    if (!settings.daytonaApiKey) {
-      onAddMessage({
-        id: generateId(),
-        role: "assistant",
-        content: "Please configure your Daytona API key in Settings.",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      })
-      return
-    }
 
     // Add user message
     const userMsg: Message = {
@@ -358,7 +344,6 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "log",
@@ -393,15 +378,11 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           contextId: branch.contextId,
           prompt,
           previewUrlPattern: branch.previewUrlPattern,
           repoName,
-          anthropicApiKey: settings.anthropicApiKey,
-          anthropicAuthType: settings.anthropicAuthType,
-          anthropicAuthToken: settings.anthropicAuthToken,
         }),
         signal: controller.signal,
       })
@@ -487,17 +468,15 @@ export function ChatPanel({
       }
     } finally {
       // Auto-commit and push any remaining changes
-      if (branch.sandboxId && settings.githubPat) {
+      if (branch.sandboxId) {
         try {
           await fetch("/api/sandbox/git", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              daytonaApiKey: settings.daytonaApiKey,
               sandboxId: branch.sandboxId,
               repoPath: `/home/daytona/${repoName}`,
               action: "auto-commit-push",
-              githubPat: settings.githubPat,
               branchName: branch.name,
             }),
           })
@@ -509,7 +488,6 @@ export function ChatPanel({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              daytonaApiKey: settings.daytonaApiKey,
               sandboxId: branch.sandboxId,
               repoPath: `/home/daytona/${repoName}`,
               action: "log",
@@ -556,7 +534,7 @@ export function ChatPanel({
         osc.stop(ctx.currentTime + 0.3)
       } catch {}
     }
-  }, [input, branch, settings, repoName, onAddMessage, onUpdateLastMessage, onUpdateBranch, onForceSave, onCommitsDetected])
+  }, [input, branch, repoName, onAddMessage, onUpdateLastMessage, onUpdateBranch, onForceSave, onCommitsDetected])
 
   function handleStop() {
     abortControllerRef.current?.abort()
@@ -572,11 +550,9 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "rename-branch",
-          githubPat: settings.githubPat,
           currentBranch: branch.name,
           newBranchName: newName,
           repoOwner: owner,
@@ -612,7 +588,7 @@ export function ChatPanel({
     setBranchesLoading(true)
     try {
       const res = await fetch(
-        `/api/github/branches?token=${encodeURIComponent(settings.githubPat)}&owner=${encodeURIComponent(repoOwner)}&repo=${encodeURIComponent(repoName)}`
+        `/api/github/branches?owner=${encodeURIComponent(repoOwner)}&repo=${encodeURIComponent(repoName)}`
       )
       const data = await res.json()
       const branches = (data.branches || []).filter((b: string) => b !== branch.name)
@@ -642,7 +618,6 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           action: isStopped ? "start" : "stop",
         }),
@@ -672,7 +647,6 @@ export function ChatPanel({
       window.open(branch.prUrl, "_blank")
       return
     }
-    if (!settings.githubPat) return
     const [owner, repo] = repoFullName.split("/")
     setActionLoading("create-pr")
     try {
@@ -680,7 +654,6 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: settings.githubPat,
           owner,
           repo,
           head: branch.name,
@@ -707,11 +680,9 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "merge",
-          githubPat: settings.githubPat,
           targetBranch: selectedBranch,
           currentBranch: branch.name,
         }),
@@ -736,11 +707,9 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "rebase",
-          githubPat: settings.githubPat,
           targetBranch: selectedBranch,
           currentBranch: branch.name,
           repoOwner: owner,
@@ -767,7 +736,6 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "reset",
@@ -827,10 +795,6 @@ export function ChatPanel({
   async function handleTag() {
     const name = tagNameInput.trim()
     if (!name) return
-    if (!settings.githubPat) {
-      addSystemMessage("GitHub PAT required to push tags. Configure it in Settings.")
-      return
-    }
     const [owner, repo] = repoFullName.split("/")
     setTagPopoverOpen(false)
     setTagNameInput("")
@@ -840,11 +804,9 @@ export function ChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          daytonaApiKey: settings.daytonaApiKey,
           sandboxId: branch.sandboxId,
           repoPath: `/home/daytona/${repoName}`,
           action: "tag",
-          githubPat: settings.githubPat,
           tagName: name,
           repoOwner: owner,
           repoApiName: repo,
@@ -952,7 +914,6 @@ export function ChatPanel({
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
-                            daytonaApiKey: settings.daytonaApiKey,
                             sandboxId: branch.sandboxId,
                           }),
                         })
@@ -988,7 +949,6 @@ export function ChatPanel({
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
-                            daytonaApiKey: settings.daytonaApiKey,
                             sandboxId: branch.sandboxId,
                           }),
                         })
@@ -1287,7 +1247,6 @@ export function ChatPanel({
           repoName={repoName}
           branchName={branch.name}
           baseBranch={branch.baseBranch}
-          settings={settings}
         />
       )}
 
@@ -1300,7 +1259,6 @@ export function ChatPanel({
           repoName={repoName}
           branchName={branch.name}
           baseBranch={branch.baseBranch}
-          settings={settings}
           commitHash={commitDiffHash}
           commitMessage={commitDiffMessage}
         />

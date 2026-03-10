@@ -33,11 +33,13 @@ interface BranchListProps {
   onAddBranch: (branch: Branch) => void
   onRemoveBranch: (branchId: string, deleteRemote?: boolean) => void
   onUpdateBranch: (branchId: string, updates: Partial<Branch>) => void
+  onQuotaRefresh?: () => void
   quota?: { current: number; max: number; remaining: number } | null
-  width: number
+  width: number | string
   onWidthChange: (w: number) => void
   pendingStartCommit?: string | null
   onClearPendingCommit?: () => void
+  isMobile?: boolean
 }
 
 function StatusDot({ branch, isActive }: { branch: Branch; isActive: boolean }) {
@@ -83,11 +85,13 @@ export function BranchList({
   onAddBranch,
   onRemoveBranch,
   onUpdateBranch,
+  onQuotaRefresh,
   quota,
   width,
   onWidthChange,
   pendingStartCommit,
   onClearPendingCommit,
+  isMobile = false,
 }: BranchListProps) {
   const [search, setSearch] = useState("")
   const [branchFromOpen, setBranchFromOpen] = useState(false)
@@ -307,9 +311,25 @@ export function BranchList({
         }),
       })
 
-      const reader = res.body!.getReader()
+      if (!res.ok) {
+        let message = `Failed to create branch (${res.status})`
+        try {
+          const data = await res.json()
+          message = data.error || data.message || message
+        } catch {
+          // Ignore parse errors and use fallback message
+        }
+        throw new Error(message)
+      }
+
+      if (!res.body) {
+        throw new Error("Failed to create branch: empty server response")
+      }
+
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
+      let hasTerminalEvent = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -326,6 +346,7 @@ export function BranchList({
               const data = JSON.parse(line.slice(6))
               if (data.type === "done") {
                 console.log("[branch-list] Received done event, startCommit:", data.startCommit)
+                hasTerminalEvent = true
                 // Use server-side branchId to replace the temporary client-side ID
                 onUpdateBranch(branchId, {
                   id: data.branchId, // Replace client ID with server ID
@@ -335,7 +356,10 @@ export function BranchList({
                   previewUrlPattern: data.previewUrlPattern,
                   startCommit: data.startCommit,
                 })
+                // Refresh quota now that sandbox is created in database
+                onQuotaRefresh?.()
               } else if (data.type === "error") {
+                hasTerminalEvent = true
                 onUpdateBranch(branchId, {
                   status: "error",
                 })
@@ -345,6 +369,10 @@ export function BranchList({
           }
         }
       }
+
+      if (!hasTerminalEvent) {
+        throw new Error("Branch creation did not complete. Please try again.")
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create branch"
       onUpdateBranch(branchId, { status: "error" })
@@ -352,10 +380,16 @@ export function BranchList({
     } finally {
       setCreating(false)
     }
-  }, [newBranchName, newBranchBase, creating, repo, onAddBranch, onUpdateBranch, branchPlaceholder, startCommit, githubBranches])
+  }, [newBranchName, newBranchBase, creating, repo, onAddBranch, onUpdateBranch, onQuotaRefresh, branchPlaceholder, startCommit, githubBranches])
+
+  // Compute width style for desktop vs mobile
+  const widthStyle = isMobile ? { width: "100%" } : { width: typeof width === "number" ? width : width }
 
   return (
-    <div className="relative flex h-full shrink-0 flex-col border-r border-border bg-card" style={{ width }}>
+    <div className={cn(
+      "relative flex h-full flex-col bg-card",
+      isMobile ? "flex-1" : "shrink-0 border-r border-border"
+    )} style={widthStyle}>
       <a
         href={`https://github.com/${repo.owner}/${repo.name}`}
         target="_blank"
@@ -398,7 +432,9 @@ export function BranchList({
                   <button
                     onClick={() => onSelectBranch(branch.id)}
                     className={cn(
-                      "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors",
+                      "flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 text-left transition-colors",
+                      // Larger touch targets on mobile
+                      isMobile ? "py-3.5 min-h-[56px]" : "py-2.5",
                       isActive
                         ? "bg-accent text-foreground"
                         : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
@@ -618,11 +654,13 @@ export function BranchList({
         </DialogContent>
       </Dialog>
 
-      {/* Resize handle */}
-      <div
-        onMouseDown={startResize}
-        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 transition-colors z-10"
-      />
+      {/* Resize handle (desktop only) */}
+      {!isMobile && (
+        <div
+          onMouseDown={startResize}
+          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 transition-colors z-10"
+        />
+      )}
     </div>
   )
 }

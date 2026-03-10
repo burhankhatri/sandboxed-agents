@@ -237,6 +237,10 @@ export function ChatPanel({
   // Track current input in a ref so we can access it in cleanup/event handlers
   const inputRef = useRef(input)
   inputRef.current = input
+  // Track polling state for background execution
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const currentExecutionIdRef = useRef<string | null>(null)
+  const currentMessageIdRef = useRef<string | null>(null)
 
   // Sync input when switching branches - save old draft then load new
   useEffect(() => {
@@ -261,12 +265,12 @@ export function ChatPanel({
     }
   }, [branch.id, branch.draftPrompt])
 
-  // Check sandbox status on mount — detect stopped sandboxes and recover from stuck "running" state
+  // Check sandbox status on mount — detect stopped sandboxes and resume polling for running executions
   useEffect(() => {
     if (!branch.sandboxId) return
 
-    // Skip if we're the ones actively running a query (abortControllerRef is set)
-    if (abortControllerRef.current) return
+    // Skip if we're already polling
+    if (pollingRef.current) return
 
     fetch("/api/sandbox/status", {
       method: "POST",
@@ -280,11 +284,17 @@ export function ChatPanel({
         if (data.state && data.state !== "started") {
           // Sandbox is stopped
           onUpdateBranch({ status: "stopped" })
-        } else if (branch.status === "running" && !abortControllerRef.current) {
-          // Branch shows "running" but we have no active SSE connection - this is a stale state
-          // This happens when the browser was closed while agent was processing
-          // Reset to idle so the user can send new messages
-          onUpdateBranch({ status: "idle" })
+        } else if (branch.status === "running" && !pollingRef.current) {
+          // Branch shows "running" - check for active execution and resume polling
+          // Find the last assistant message that might have a running execution
+          const lastAssistantMsg = [...branch.messages].reverse().find(m => m.role === "assistant" && !m.commitHash)
+          if (lastAssistantMsg) {
+            currentMessageIdRef.current = lastAssistantMsg.id
+            startPolling(lastAssistantMsg.id)
+          } else {
+            // No message to poll for, reset status
+            onUpdateBranch({ status: "idle" })
+          }
         }
       })
       .catch(() => {})
@@ -360,6 +370,149 @@ export function ChatPanel({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [branch.id, branch.draftPrompt, branch.status])
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
+  }, [])
+
+  // Start polling for execution status
+  const startPolling = useCallback((messageId: string, executionId?: string) => {
+    // Clear any existing polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+    }
+
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/agent/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messageId,
+            executionId,
+          }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error("Polling error:", data.error)
+          return
+        }
+
+        // Update message content
+        if (data.content || (data.toolCalls && data.toolCalls.length > 0)) {
+          const toolCallsWithIds = (data.toolCalls || []).map((tc: { tool: string; summary: string }, idx: number) => ({
+            id: `tc-${idx}`,
+            tool: tc.tool,
+            summary: tc.summary,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          }))
+          onUpdateMessage(messageId, {
+            content: data.content || "",
+            toolCalls: toolCallsWithIds,
+          })
+        }
+
+        // Update session ID if provided
+        if (data.sessionId) {
+          onUpdateBranch({ sessionId: data.sessionId })
+        }
+
+        // Check if completed or error
+        if (data.status === "completed" || data.status === "error") {
+          // Stop polling
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
+          currentExecutionIdRef.current = null
+          currentMessageIdRef.current = null
+
+          // Add error to content if present
+          if (data.status === "error" && data.error) {
+            onUpdateMessage(messageId, {
+              content: data.content ? `${data.content}\n\nError: ${data.error}` : `Error: ${data.error}`,
+            })
+          }
+
+          // Update branch status
+          onUpdateBranch({ status: "idle", lastActivity: "now", lastActivityTs: Date.now() })
+          onForceSave()
+
+          // Check for new commits
+          if (branch.sandboxId) {
+            try {
+              await fetch("/api/sandbox/git", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sandboxId: branch.sandboxId,
+                  repoPath: `/home/daytona/${repoName}`,
+                  action: "auto-commit-push",
+                  branchName: branch.name,
+                }),
+              })
+
+              const logRes = await fetch("/api/sandbox/git", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sandboxId: branch.sandboxId,
+                  repoPath: `/home/daytona/${repoName}`,
+                  action: "log",
+                }),
+              })
+              const logData = await logRes.json()
+              const allCommits: { shortHash: string; message: string }[] = logData.commits || []
+              const chatCommits = new Set(branch.messages.filter((m) => m.commitHash).map((m) => m.commitHash))
+              const newCommits = allCommits.filter((c) => !knownCommitsRef.current.has(c.shortHash) && !chatCommits.has(c.shortHash))
+              for (const c of [...newCommits].reverse()) {
+                knownCommitsRef.current.add(c.shortHash)
+                onAddMessage({
+                  id: generateId(),
+                  role: "assistant",
+                  content: "",
+                  timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  commitHash: c.shortHash,
+                  commitMessage: c.message,
+                })
+              }
+              if (newCommits.length > 0) {
+                onCommitsDetected?.()
+              }
+            } catch {}
+          }
+
+          // Play notification sound
+          try {
+            const ctx = new AudioContext()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.frequency.value = 880
+            osc.type = "sine"
+            gain.gain.setValueAtTime(0.15, ctx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+            osc.start(ctx.currentTime)
+            osc.stop(ctx.currentTime + 0.3)
+          } catch {}
+        }
+      } catch (err) {
+        console.error("Polling failed:", err)
+      }
+    }
+
+    // Start polling immediately, then every 500ms
+    poll()
+    pollingRef.current = setInterval(poll, 500)
+  }, [branch.sandboxId, branch.name, branch.messages, repoName, onUpdateMessage, onUpdateBranch, onAddMessage, onForceSave, onCommitsDetected])
+
   const handleSend = useCallback(async () => {
     const prompt = input.trim()
     if (!prompt || branch.status === "running" || branch.status === "creating") return
@@ -387,232 +540,66 @@ export function ChatPanel({
       toolCalls: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
-    let currentMessageId = await onAddMessage(assistantMsg)
-
-    // Stream the response - pass messageId so server can save output if client disconnects
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    let content = ""
-    let toolCalls: ToolCall[] = []
-    let hadToolCalls = false
-    let needsNewBubble = false
-    const initialMessageId = currentMessageId
-
-    async function startNewBubble() {
-      content = ""
-      toolCalls = []
-      hadToolCalls = false
-      const newMsg: Message = {
-        id: generateId(),
-        role: "assistant",
-        content: "",
-        toolCalls: [],
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }
-      currentMessageId = await onAddMessage(newMsg)
-    }
-
-    // Check for new commits inline (fire-and-forget)
-    function checkForNewCommits() {
-      if (!branch.sandboxId) return
-      fetch("/api/sandbox/git", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sandboxId: branch.sandboxId,
-          repoPath: `/home/daytona/${repoName}`,
-          action: "log",
-        }),
-      })
-        .then((r) => r.json())
-        .then((logData) => {
-          const allCommits: { shortHash: string; message: string }[] = logData.commits || []
-          const chatCommits = new Set(branch.messages.filter((m) => m.commitHash).map((m) => m.commitHash))
-          const newCommits = allCommits.filter((c) => !knownCommitsRef.current.has(c.shortHash) && !chatCommits.has(c.shortHash))
-          for (const c of [...newCommits].reverse()) {
-            knownCommitsRef.current.add(c.shortHash)
-            onAddMessage({
-              id: generateId(),
-              role: "assistant",
-              content: "",
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              commitHash: c.shortHash,
-              commitMessage: c.message,
-            })
-          }
-          if (newCommits.length > 0) {
-            onCommitsDetected?.()
-            needsNewBubble = true
-          }
-        })
-        .catch(() => {})
-    }
+    const messageId = await onAddMessage(assistantMsg)
+    currentMessageIdRef.current = messageId
 
     try {
-      const response = await fetch("/api/agent/query", {
+      // Start background execution
+      const response = await fetch("/api/agent/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sandboxId: branch.sandboxId,
-          contextId: branch.contextId,
           prompt,
           previewUrlPattern: branch.previewUrlPattern,
           repoName,
-          messageId: initialMessageId, // Pass messageId so server can save output if client disconnects
+          messageId,
         }),
-        signal: controller.signal,
       })
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || "Request failed")
+        throw new Error(data.error || "Failed to start agent")
       }
 
-      const reader = response.body!.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
+      const { executionId } = await response.json()
+      currentExecutionIdRef.current = executionId
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      // Start polling for updates
+      startPolling(messageId, executionId)
 
-        buffer += decoder.decode(value, { stream: true })
-        const parts = buffer.split("\n\n")
-        buffer = parts.pop()!
-
-        for (const part of parts) {
-          for (const line of part.split("\n")) {
-            if (!line.startsWith("data: ")) continue
-            try {
-              const data = JSON.parse(line.slice(6))
-              if (data.type === "stdout" || data.type === "stderr") {
-                const text = data.content as string
-                if (text.startsWith("TOOL_USE:")) {
-                  // Start fresh bubble if commits were inserted since last tool call
-                  if (needsNewBubble) {
-                    await startNewBubble()
-                    needsNewBubble = false
-                  }
-                  const toolSummary = text.replace("TOOL_USE:", "").trim()
-                  const toolName = toolSummary.split(":")[0].trim()
-                  toolCalls = [
-                    ...toolCalls,
-                    {
-                      id: generateId(),
-                      tool: toolName,
-                      summary: toolSummary,
-                      timestamp: new Date().toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }),
-                    },
-                  ]
-                  hadToolCalls = true
-                  // Detect git commit tool calls and check for new commits inline
-                  if (toolName === "Bash" && /git\s+commit/.test(toolSummary)) {
-                    checkForNewCommits()
-                  }
-                } else {
-                  // If text arrives after tool calls or commits were inserted, start a new bubble
-                  if ((hadToolCalls || needsNewBubble) && text.trim()) {
-                    await startNewBubble()
-                    needsNewBubble = false
-                  }
-                  content += text
-                }
-                onUpdateMessage(currentMessageId, { content, toolCalls })
-              } else if (data.type === "context-updated") {
-                onUpdateBranch({ contextId: data.contextId })
-              } else if (data.type === "session-id") {
-                onUpdateBranch({ sessionId: data.sessionId })
-              } else if (data.type === "error") {
-                content += content ? `\n\nError: ${data.message}` : `Error: ${data.message}`
-                onUpdateMessage(currentMessageId, { content })
-              }
-            } catch {}
-          }
-        }
-      }
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        content += content ? "\n\n[Stopped by user]" : "[Stopped by user]"
-        onUpdateMessage(currentMessageId, { content })
-      } else {
-        const message = err instanceof Error ? err.message : "Unknown error"
-        content += content ? `\n\nError: ${message}` : `Error: ${message}`
-        onUpdateMessage(currentMessageId, { content })
-      }
-    } finally {
-      // Auto-commit and push any remaining changes
-      if (branch.sandboxId) {
-        try {
-          await fetch("/api/sandbox/git", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sandboxId: branch.sandboxId,
-              repoPath: `/home/daytona/${repoName}`,
-              action: "auto-commit-push",
-              branchName: branch.name,
-            }),
-          })
-        } catch {}
-
-        // Detect new commits and insert inline markers
-        try {
-          const logRes = await fetch("/api/sandbox/git", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sandboxId: branch.sandboxId,
-              repoPath: `/home/daytona/${repoName}`,
-              action: "log",
-            }),
-          })
-          const logData = await logRes.json()
-          const allCommits: { shortHash: string; message: string }[] = logData.commits || []
-          // Also check commits already rendered in the chat to avoid duplicates
-          const chatCommits = new Set(branch.messages.filter((m) => m.commitHash).map((m) => m.commitHash))
-          const newCommits = allCommits.filter((c) => !knownCommitsRef.current.has(c.shortHash) && !chatCommits.has(c.shortHash))
-          // Insert oldest-first so they appear chronologically
-          for (const c of [...newCommits].reverse()) {
-            knownCommitsRef.current.add(c.shortHash)
-            onAddMessage({
-              id: generateId(),
-              role: "assistant",
-              content: "",
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              commitHash: c.shortHash,
-              commitMessage: c.message,
-            })
-          }
-          if (newCommits.length > 0) {
-            onCommitsDetected?.()
-          }
-        } catch {}
-      }
-      onUpdateBranch({ status: "idle", lastActivity: "now", lastActivityTs: Date.now() })
-      abortControllerRef.current = null
-      onForceSave()
-
-      // Play notification sound when agent finishes
-      try {
-        const ctx = new AudioContext()
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        osc.frequency.value = 880
-        osc.type = "sine"
-        gain.gain.setValueAtTime(0.15, ctx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
-        osc.start(ctx.currentTime)
-        osc.stop(ctx.currentTime + 0.3)
-      } catch {}
+      const message = err instanceof Error ? err.message : "Unknown error"
+      onUpdateMessage(messageId, { content: `Error: ${message}` })
+      onUpdateBranch({ status: "idle" })
+      currentMessageIdRef.current = null
+      currentExecutionIdRef.current = null
     }
-  }, [input, branch, repoName, onAddMessage, onUpdateMessage, onUpdateBranch, onForceSave, onCommitsDetected])
+  }, [input, branch, repoName, onAddMessage, onUpdateMessage, onUpdateBranch, startPolling])
 
   function handleStop() {
+    // Stop polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+
+    // Update message with stopped indicator
+    if (currentMessageIdRef.current) {
+      // Get current content and append stopped message
+      const lastMsg = branch.messages.find(m => m.id === currentMessageIdRef.current)
+      const currentContent = lastMsg?.content || ""
+      onUpdateMessage(currentMessageIdRef.current, {
+        content: currentContent ? `${currentContent}\n\n[Stopped by user]` : "[Stopped by user]"
+      })
+    }
+
+    // Reset state
+    currentExecutionIdRef.current = null
+    currentMessageIdRef.current = null
+    onUpdateBranch({ status: "idle" })
+
+    // Legacy: also abort any SSE connection
     abortControllerRef.current?.abort()
   }
 

@@ -264,8 +264,8 @@ export default function Home() {
       })
     )
 
-    // Update status in database
-    if (updates.status || updates.prUrl || updates.name) {
+    // Update in database
+    if (updates.status || updates.prUrl || updates.name || updates.draftPrompt !== undefined) {
       fetch("/api/branches", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

@@ -93,7 +93,7 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json()
-  const { branchId, status, prUrl, name } = body
+  const { branchId, status, prUrl, name, draftPrompt } = body
 
   if (!branchId) {
     return Response.json({ error: "Missing branch ID" }, { status: 400 })
@@ -115,6 +115,7 @@ export async function PATCH(req: Request) {
       ...(status && { status }),
       ...(prUrl !== undefined && { prUrl }),
       ...(name && { name }),
+      ...(draftPrompt !== undefined && { draftPrompt }),
     },
     include: {
       sandbox: true,

@@ -110,29 +110,10 @@ export default function Home() {
   const [credentials, setCredentials] = useState<UserCredentials | null>(null)
   const [loaded, setLoaded] = useState(false)
 
-  // Initialize from localStorage to preserve selection across page reloads
-  const [activeRepoId, setActiveRepoId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null
-    return localStorage.getItem("activeRepoId")
-  })
-  const [activeBranchId, setActiveBranchId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null
-    return localStorage.getItem("activeBranchId")
-  })
+  const [activeRepoId, setActiveRepoId] = useState<string | null>(null)
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(null)
   const activeBranchIdRef = useRef(activeBranchId)
   activeBranchIdRef.current = activeBranchId
-
-  // Persist active IDs to localStorage
-  useEffect(() => {
-    if (activeRepoId) {
-      localStorage.setItem("activeRepoId", activeRepoId)
-    }
-  }, [activeRepoId])
-  useEffect(() => {
-    if (activeBranchId) {
-      localStorage.setItem("activeBranchId", activeBranchId)
-    }
-  }, [activeBranchId])
 
   const [mobileView, setMobileView] = useState<"branches" | "chat">("branches")
   const [branchListWidth, setBranchListWidth] = useState(260)
@@ -156,16 +137,6 @@ export default function Home() {
     fetch("/api/user/me", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        // Debug: log message counts from API
-        if (data.repos) {
-          for (const repo of data.repos) {
-            for (const branch of repo.branches) {
-              if (branch.messages?.length > 0) {
-                console.log(`[API] Branch "${branch.name}" has ${branch.messages.length} messages`)
-              }
-            }
-          }
-        }
         if (data.repos) {
           const transformedRepos = data.repos.map(transformRepo)
           setRepos(transformedRepos)
@@ -184,29 +155,15 @@ export default function Home() {
       })
   }, [status])
 
-  // Auto-select repo/branch on load - validate stored IDs or fall back to first
+  // Auto-select first repo/branch on load
   useEffect(() => {
-    if (!loaded || repos.length === 0) return
-
-    // Check if stored activeRepoId is valid
-    const storedRepo = activeRepoId ? repos.find((r) => r.id === activeRepoId) : null
-    if (storedRepo) {
-      // Repo is valid, check if stored branch is also valid
-      const storedBranch = activeBranchId
-        ? storedRepo.branches.find((b) => b.id === activeBranchId)
-        : null
-      if (!storedBranch && storedRepo.branches.length > 0) {
-        // Branch not found, select first branch of this repo
-        setActiveBranchId(storedRepo.branches[0].id)
-      }
-    } else {
-      // Repo not found, fall back to first repo and branch
+    if (loaded && repos.length > 0 && !activeRepoId) {
       setActiveRepoId(repos[0].id)
       if (repos[0].branches.length > 0) {
         setActiveBranchId(repos[0].branches[0].id)
       }
     }
-  }, [loaded, repos, activeRepoId, activeBranchId])
+  }, [loaded, repos, activeRepoId])
 
   // Dynamic page title with agent counts
   useEffect(() => {
@@ -391,7 +348,6 @@ export default function Home() {
 
     // Save message to database and get the real DB ID
     try {
-      console.log(`[DB] Saving ${message.role} message to branch ${branchId}...`)
       const res = await fetch("/api/branches/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -407,13 +363,12 @@ export default function Home() {
       })
 
       if (!res.ok) {
-        console.error("[DB] Failed to save message to database:", res.status, res.statusText)
+        console.error("Failed to save message to database:", res.status, res.statusText)
         return message.id
       }
 
       const data = await res.json()
       const dbId = data.message?.id
-      console.log(`[DB] Message saved with ID: ${dbId}`)
 
       if (dbId && dbId !== message.id) {
         // Update local state with the real database ID
@@ -473,15 +428,9 @@ export default function Home() {
         content: updates.content,
         toolCalls: updates.toolCalls,
       }),
+    }).catch((error) => {
+      console.error("Error updating message in database:", error)
     })
-      .then((res) => {
-        if (!res.ok) {
-          console.error(`[DB] Failed to update message ${messageId}:`, res.status, res.statusText)
-        }
-      })
-      .catch((error) => {
-        console.error("[DB] Error updating message in database:", error)
-      })
   }, [activeRepo])
 
   const handleCredentialsUpdate = useCallback(() => {

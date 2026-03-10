@@ -533,9 +533,13 @@ export function ChatPanel({
               const logData = await logRes.json()
               const allCommits: { shortHash: string; message: string }[] = logData.commits || []
 
+              console.log("[commit-detection] startingCommitRef:", startingCommitRef.current)
+              console.log("[commit-detection] allCommits:", allCommits.slice(0, 5).map(c => c.shortHash))
+
               // If we don't have a starting commit yet, set it now and skip detection
               // This handles the race condition where agent completes before baseline is set
               if (!startingCommitRef.current) {
+                console.log("[commit-detection] No starting commit, setting baseline and skipping detection")
                 if (allCommits.length > 0) {
                   startingCommitRef.current = allCommits[0].shortHash
                 }
@@ -546,12 +550,18 @@ export function ChatPanel({
                 const newCommits: { shortHash: string; message: string }[] = []
                 for (const c of allCommits) {
                   // Stop when we reach the starting commit (everything after this existed before the session)
-                  if (c.shortHash === startingCommitRef.current) break
+                  if (c.shortHash === startingCommitRef.current) {
+                    console.log("[commit-detection] Found starting commit, stopping:", c.shortHash)
+                    break
+                  }
                   // Skip commits already shown in the chat
                   if (!chatCommits.has(c.shortHash)) {
+                    console.log("[commit-detection] New commit found:", c.shortHash, c.message)
                     newCommits.push(c)
                   }
                 }
+
+                console.log("[commit-detection] newCommits count:", newCommits.length)
 
                 // Add new commits to the chat (reverse to show oldest first)
                 for (const c of [...newCommits].reverse()) {

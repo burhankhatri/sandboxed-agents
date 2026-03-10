@@ -57,16 +57,67 @@ export async function POST(req: Request) {
 
   const encoder = new TextEncoder()
 
+  // Capture record IDs for use in helper functions (already null-checked above)
+  const sandboxDbId = sandboxRecord.id
+  const branchDbId = sandboxRecord.branch?.id
+
   // Accumulate output so we can save it to DB even if client disconnects
   let accumulatedContent = ""
   let accumulatedToolCalls: { tool: string; summary: string }[] = []
+  let streamCancelled = false
+  let hasSavedToDb = false
+
+  // Helper to save accumulated content to DB (idempotent)
+  async function saveAccumulatedContent() {
+    if (hasSavedToDb) return
+    if (!messageId) return
+    if (!accumulatedContent && accumulatedToolCalls.length === 0) return
+
+    hasSavedToDb = true
+    try {
+      await prisma.message.update({
+        where: { id: messageId },
+        data: {
+          content: accumulatedContent,
+          toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+        },
+      })
+    } catch {
+      // Message may not exist if client disconnected before it was saved
+    }
+
+    // Also update branch/sandbox status to idle when cancelled
+    if (streamCancelled) {
+      try {
+        await prisma.sandbox.update({
+          where: { id: sandboxDbId },
+          data: { status: "idle" },
+        })
+        if (branchDbId) {
+          await prisma.branch.update({
+            where: { id: branchDbId },
+            data: { status: "idle" },
+          })
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Safe send that doesn't throw if stream is cancelled
       function send(data: Record<string, unknown>) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-        )
+        if (streamCancelled) return
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+          )
+        } catch {
+          // Controller is closed/cancelled, ignore the error
+          streamCancelled = true
+        }
       }
 
       try {
@@ -163,19 +214,7 @@ export async function POST(req: Request) {
         }
 
         // Save accumulated output to database - ensures message is persisted even if client disconnects
-        if (messageId && (accumulatedContent || accumulatedToolCalls.length > 0)) {
-          try {
-            await prisma.message.update({
-              where: { id: messageId },
-              data: {
-                content: accumulatedContent,
-                toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
-              },
-            })
-          } catch {
-            // Message may not exist if client disconnected before it was saved
-          }
-        }
+        await saveAccumulatedContent()
 
         // Update sandbox and branch status back to idle
         await prisma.sandbox.update({
@@ -194,27 +233,25 @@ export async function POST(req: Request) {
         const message = error instanceof Error ? error.message : "Unknown error"
 
         // Save error message to database if we have a messageId
-        if (messageId) {
-          const errorContent = accumulatedContent
-            ? `${accumulatedContent}\n\nError: ${message}`
+        // Only add error to content if it's not a stream cancellation
+        if (!streamCancelled) {
+          accumulatedContent += accumulatedContent
+            ? `\n\nError: ${message}`
             : `Error: ${message}`
-          try {
-            await prisma.message.update({
-              where: { id: messageId },
-              data: {
-                content: errorContent,
-                toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
-              },
-            })
-          } catch {
-            // Message may not exist
-          }
         }
+        await saveAccumulatedContent()
 
         send({ type: "error", message })
       }
 
       controller.close()
+    },
+    cancel() {
+      // Called when the client disconnects (e.g., page refresh)
+      streamCancelled = true
+      // Save whatever we have accumulated so far
+      // This runs async but we don't need to wait for it
+      saveAccumulatedContent()
     },
   })
 

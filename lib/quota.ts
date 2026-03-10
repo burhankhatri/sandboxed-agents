@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 
-const MAX_CONCURRENT_SANDBOXES = 5
+const MAX_CONCURRENT_SANDBOXES = 10
 
 export async function checkQuota(userId: string): Promise<{
   allowed: boolean

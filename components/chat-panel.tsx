@@ -333,7 +333,8 @@ export function ChatPanel({
       content: prompt,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
-    onAddMessage(userMsg)
+    // Await user message save to ensure it persists before continuing
+    await onAddMessage(userMsg)
     setInput("")
 
     // Set branch to running and clear draft

@@ -361,6 +361,12 @@ export default function Home() {
           commitMessage: message.commitMessage,
         }),
       })
+
+      if (!res.ok) {
+        console.error("Failed to save message to database:", res.status, res.statusText)
+        return message.id
+      }
+
       const data = await res.json()
       const dbId = data.message?.id
 
@@ -386,7 +392,8 @@ export default function Home() {
         return dbId
       }
       return message.id
-    } catch {
+    } catch (error) {
+      console.error("Error saving message to database:", error)
       return message.id
     }
   }, [activeRepo])
@@ -421,7 +428,9 @@ export default function Home() {
         content: updates.content,
         toolCalls: updates.toolCalls,
       }),
-    }).catch(() => {})
+    }).catch((error) => {
+      console.error("Error updating message in database:", error)
+    })
   }, [activeRepo])
 
   const handleCredentialsUpdate = useCallback(() => {

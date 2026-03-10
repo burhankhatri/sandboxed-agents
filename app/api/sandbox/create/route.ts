@@ -146,8 +146,9 @@ export async function POST(req: Request) {
         }
 
         // Capture the current HEAD commit as the starting point for commit detection
+        // Use git log format to ensure consistent hash format with the log action
         const headResult = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git rev-parse --short HEAD 2>&1`
+          `cd ${repoPath} && git log -1 --format='%h' 2>&1`
         )
         const headCommit = headResult.exitCode ? null : headResult.result.trim()
 

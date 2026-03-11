@@ -1175,8 +1175,8 @@ export function ChatPanel({
 
         {/* Messages */}
         <div ref={scrollRef} onScroll={handleScroll} className={cn(
-          "flex-1 min-h-0 overflow-y-auto",
-          isMobile ? "px-3 py-4 pb-4" : "px-3 py-6 sm:px-6"
+          "flex-1 min-h-0 overflow-y-auto overscroll-contain",
+          isMobile ? "px-3 py-4 pb-4 touch-pan-y" : "px-3 py-6 sm:px-6"
         )}>
           {branch.status === "creating" ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">

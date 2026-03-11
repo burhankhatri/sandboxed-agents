@@ -126,9 +126,14 @@ export function MobileSidebarDrawer({
     ? [...activeRepo.branches].sort((a, b) => (b.lastActivityTs ?? 0) - (a.lastActivityTs ?? 0))
     : []
 
+  // Only render drawer when open to avoid blocking touch events
+  if (!open) {
+    return null
+  }
+
   return (
     <>
-      <Drawer open={open} onOpenChange={onOpenChange} direction="left">
+      <Drawer open={open} onOpenChange={onOpenChange} direction="left" modal={true}>
         <DrawerContent
           className="h-full w-[300px] max-w-[85vw] rounded-none border-r border-border"
           style={{ paddingTop: 'var(--safe-area-inset-top)' }}

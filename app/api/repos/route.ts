@@ -16,11 +16,17 @@ export async function GET() {
           sandbox: true,
           messages: {
             orderBy: { createdAt: "asc" },
+            take: 100, // Limit messages to prevent OOM on large conversations
+          },
+          _count: {
+            select: { messages: true }, // Include total count for pagination
           },
         },
+        take: 50, // Limit branches per repo
       },
     },
     orderBy: { createdAt: "desc" },
+    take: 100, // Limit total repos
   })
 
   return Response.json({ repos })

@@ -13,6 +13,8 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const branchId = searchParams.get("branchId")
+  const cursor = searchParams.get("cursor") // For pagination
+  const limit = Math.min(parseInt(searchParams.get("limit") || "100"), 500) // Default 100, max 500
 
   if (!branchId) {
     return Response.json({ error: "Missing branch ID" }, { status: 400 })
@@ -31,9 +33,28 @@ export async function GET(req: Request) {
   const messages = await prisma.message.findMany({
     where: { branchId },
     orderBy: { createdAt: "asc" },
+    take: limit,
+    ...(cursor && {
+      skip: 1,
+      cursor: { id: cursor },
+    }),
   })
 
-  return Response.json({ messages })
+  // Get total count for pagination info
+  const totalCount = await prisma.message.count({
+    where: { branchId },
+  })
+
+  const nextCursor = messages.length === limit ? messages[messages.length - 1]?.id : null
+
+  return Response.json({
+    messages,
+    pagination: {
+      totalCount,
+      hasMore: !!nextCursor,
+      nextCursor,
+    },
+  })
 }
 
 export async function POST(req: Request) {

@@ -85,11 +85,11 @@ function ToolCallTimeline({ toolCalls }: { toolCalls: ToolCall[] }) {
       <div className="absolute left-[5.5px] top-2 bottom-2 w-px bg-border" />
       <div className="flex flex-col">
         {toolCalls.map((tc) => (
-          <div key={tc.id} className="relative flex items-center gap-2.5 py-[5px]">
-            <div className="relative z-10 flex h-[12px] w-[12px] shrink-0 items-center justify-center text-muted-foreground">
+          <div key={tc.id} className="relative flex items-start gap-2.5 py-[5px] min-w-0">
+            <div className="relative z-10 flex h-[12px] w-[12px] shrink-0 items-center justify-center text-muted-foreground mt-0.5">
               <ToolCallIcon tool={tc.tool} />
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground break-words min-w-0">
               {tc.summary}
             </span>
           </div>
@@ -102,7 +102,7 @@ function ToolCallTimeline({ toolCalls }: { toolCalls: ToolCall[] }) {
 // Render a text block with markdown
 function TextBlockContent({ text }: { text: string }) {
   return (
-    <div className="rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
+    <div className="rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all">
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -193,8 +193,8 @@ function MessageBubble({ message, onCommitClick, onBranchFromCommit }: { message
             className={cn(
               "rounded-lg px-4 py-2.5 text-sm leading-relaxed",
               isUser
-                ? "bg-primary/15 text-foreground whitespace-pre-wrap"
-                : "bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
+                ? "bg-primary/15 text-foreground whitespace-pre-wrap break-words"
+                : "bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all"
             )}
           >
             {message.content ? (

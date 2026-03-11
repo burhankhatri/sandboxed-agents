@@ -355,18 +355,25 @@ export function ChatPanel({
         } else if (branch.status === "running" && !pollingRef.current) {
           // Branch shows "running" - check for active execution and resume polling
           // Find the last assistant message that might have a running execution
-          const lastAssistantMsg = [...branch.messages].reverse().find(m => m.role === "assistant" && !m.commitHash)
-          if (lastAssistantMsg) {
-            currentMessageIdRef.current = lastAssistantMsg.id
-            startPolling(lastAssistantMsg.id)
-          } else {
-            // No message to poll for, reset status
+          // Note: branch.messages comes from closure, which should be current since it's in deps
+          if (!branch.messages || branch.messages.length === 0) {
+            // No messages at all - this is likely a stale "running" status, reset it
+            console.log("[chat-panel] Branch shows running but has no messages, resetting to idle")
             onUpdateBranch({ status: "idle" })
+          } else {
+            const lastAssistantMsg = [...branch.messages].reverse().find(m => m.role === "assistant" && !m.commitHash)
+            if (lastAssistantMsg) {
+              currentMessageIdRef.current = lastAssistantMsg.id
+              startPolling(lastAssistantMsg.id)
+            } else {
+              // No message to poll for, reset status
+              onUpdateBranch({ status: "idle" })
+            }
           }
         }
       })
       .catch(() => {})
-  }, [branch.id, branch.sandboxId, branch.status, onUpdateBranch])
+  }, [branch.id, branch.sandboxId, branch.status, branch.messages, onUpdateBranch, startPolling])
 
   // Update startingCommitRef when branch changes (e.g., switching branches)
   useEffect(() => {

@@ -102,7 +102,7 @@ function ToolCallTimeline({ toolCalls }: { toolCalls: ToolCall[] }) {
 // Render a text block with markdown
 function TextBlockContent({ text }: { text: string }) {
   return (
-    <div className="rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full">
+    <div className="rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-x-auto [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full min-w-0">
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -152,7 +152,7 @@ function MessageBubble({ message, onCommitClick, onBranchFromCommit }: { message
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col min-w-0 max-w-full">
       <div className="flex items-center gap-2 mb-1">
         {!isUser && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/20">
@@ -170,7 +170,7 @@ function MessageBubble({ message, onCommitClick, onBranchFromCommit }: { message
 
       {/* Render interleaved content blocks if available */}
       {hasContentBlocks ? (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 min-w-0 max-w-full">
           {message.contentBlocks!.map((block, idx) => {
             if (block.type === "text") {
               return <TextBlockContent key={idx} text={block.text} />
@@ -194,7 +194,7 @@ function MessageBubble({ message, onCommitClick, onBranchFromCommit }: { message
               "rounded-lg px-4 py-2.5 text-sm leading-relaxed",
               isUser
                 ? "bg-primary/15 text-foreground whitespace-pre-wrap break-words"
-                : "bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full"
+                : "bg-secondary/60 text-foreground prose dark:prose-invert prose-sm max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-background/50 prose-pre:text-xs prose-code:text-xs prose-code:bg-background/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 break-words overflow-x-auto [&_pre]:overflow-x-auto [&_code]:break-all [&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full min-w-0"
             )}
           >
             {message.content ? (
@@ -1000,7 +1000,7 @@ export function ChatPanel({
     <TooltipProvider delayDuration={0}>
       <div className={cn(
         "flex min-w-0 flex-1 flex-col bg-background overflow-hidden",
-        isMobile ? "h-full" : "min-h-0"
+        isMobile ? "h-full w-full max-w-full" : "min-h-0"
       )}>
         {/* Header - hidden on mobile since MobileHeader handles it */}
         {!isMobile && (
@@ -1203,7 +1203,7 @@ export function ChatPanel({
         {/* Messages */}
         <div ref={scrollRef} onScroll={handleScroll} className={cn(
           "flex-1 overflow-y-auto overscroll-contain",
-          isMobile ? "px-3 py-4 pb-4 touch-pan-y h-0 overflow-x-hidden" : "min-h-0 px-3 py-6 sm:px-6"
+          isMobile ? "px-3 py-4 pb-4 touch-pan-y h-0 overflow-x-hidden w-full max-w-full" : "min-h-0 px-3 py-6 sm:px-6"
         )}>
           {branch.status === "creating" ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -1237,7 +1237,7 @@ export function ChatPanel({
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-5 min-w-0">
+            <div className="flex flex-col gap-5 min-w-0 w-full max-w-full">
               {branch.messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} onCommitClick={(hash, msg) => { setCommitDiffHash(hash); setCommitDiffMessage(msg) }} onBranchFromCommit={onBranchFromCommit} />
               ))}

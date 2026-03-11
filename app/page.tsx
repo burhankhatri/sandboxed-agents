@@ -717,7 +717,7 @@ export default function Home() {
 
         {/* Mobile: Header + Chat (Slack-like layout) */}
         {isMobile && (
-          <div className="flex flex-1 flex-col min-h-0 sm:hidden">
+          <div className="flex flex-1 flex-col min-h-0 min-w-0 w-full max-w-full overflow-hidden sm:hidden">
             {/* Mobile Header with hamburger and actions */}
             <MobileHeader
               repoOwner={activeRepo?.owner || null}
@@ -738,7 +738,7 @@ export default function Home() {
             />
 
             {/* Chat content */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               {activeBranch && activeRepo ? (
                 <ChatPanel
                   branch={activeBranch}

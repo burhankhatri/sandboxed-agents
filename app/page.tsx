@@ -620,79 +620,223 @@ export default function Home() {
   }, [activeBranch, activeRepo, handleUpdateBranch])
 
   // Cross-device sync - polls for changes from other devices
-  const handleSyncBranchStatusChange = useCallback((branchId: string, status: string) => {
-    setRepos((prev) =>
-      prev.map((r) => ({
-        ...r,
-        branches: r.branches.map((b) =>
-          b.id === branchId ? { ...b, status: status as Branch["status"] } : b
-        ),
-      }))
-    )
-  }, [])
+  // Using a ref to track last message IDs to detect new messages
+  const lastMessageIdsRef = useRef<Map<string, string | null>>(new Map())
 
-  const handleSyncBranchPrUrlChange = useCallback((branchId: string, prUrl: string) => {
-    setRepos((prev) =>
-      prev.map((r) => ({
-        ...r,
-        branches: r.branches.map((b) =>
-          b.id === branchId ? { ...b, prUrl } : b
-        ),
-      }))
-    )
-  }, [])
-
-  const handleSyncNewMessage = useCallback((branchId: string) => {
-    // Mark branch as having unread messages if it's not the active branch
-    if (branchId !== activeBranchId) {
-      setRepos((prev) =>
-        prev.map((r) => ({
-          ...r,
-          branches: r.branches.map((b) =>
-            b.id === branchId ? { ...b, unread: true } : b
-          ),
-        }))
-      )
+  const handleSyncData = useCallback((
+    data: { repos: Array<{ id: string; name: string; owner: string; avatar: string | null; defaultBranch: string; branches: Array<{ id: string; name: string; status: string; baseBranch: string | null; prUrl: string | null; sandboxId: string | null; lastMessageId: string | null }> }> },
+    lastData: typeof data | null
+  ) => {
+    // Skip first sync (just populate baseline)
+    if (!lastData) {
+      // Initialize message ID tracking
+      for (const repo of data.repos) {
+        for (const branch of repo.branches) {
+          lastMessageIdsRef.current.set(branch.id, branch.lastMessageId)
+        }
+      }
+      return
     }
-    // If it's the active branch, reload messages
-    if (branchId === activeBranchId) {
-      fetch(`/api/branches/messages?branchId=${branchId}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.messages) {
-            setRepos((prev) =>
-              prev.map((r) => ({
-                ...r,
-                branches: r.branches.map((b) => {
-                  if (b.id !== branchId) return b
+
+    const lastRepoMap = new Map(lastData.repos.map((r) => [r.id, r]))
+    const currentRepoMap = new Map(data.repos.map((r) => [r.id, r]))
+
+    // Check for repo changes
+    const reposChanged =
+      data.repos.length !== lastData.repos.length ||
+      data.repos.some((r) => !lastRepoMap.has(r.id)) ||
+      lastData.repos.some((r) => !currentRepoMap.has(r.id))
+
+    if (reposChanged) {
+      // Repos added or removed - update the full list
+      setRepos((prev) => {
+        const newRepos = data.repos.map((syncRepo) => {
+          // Try to preserve existing local data (messages, etc)
+          const existing = prev.find((r) => r.id === syncRepo.id)
+          if (existing) {
+            // Update branches while preserving messages
+            return {
+              ...existing,
+              branches: syncRepo.branches.map((syncBranch) => {
+                const existingBranch = existing.branches.find((b) => b.id === syncBranch.id)
+                if (existingBranch) {
                   return {
-                    ...b,
-                    messages: data.messages.map((m: DbMessage) => ({
-                      id: m.id,
-                      role: m.role as "user" | "assistant",
-                      content: m.content,
-                      toolCalls: m.toolCalls as Message["toolCalls"],
-                      timestamp: m.timestamp || "",
-                      commitHash: m.commitHash || undefined,
-                      commitMessage: m.commitMessage || undefined,
-                    })),
+                    ...existingBranch,
+                    status: syncBranch.status as Branch["status"],
+                    prUrl: syncBranch.prUrl || undefined,
+                    sandboxId: syncBranch.sandboxId || undefined,
                   }
-                }),
-              }))
-            )
+                }
+                // New branch from sync
+                return {
+                  id: syncBranch.id,
+                  name: syncBranch.name,
+                  status: syncBranch.status as Branch["status"],
+                  baseBranch: syncBranch.baseBranch || "main",
+                  prUrl: syncBranch.prUrl || undefined,
+                  sandboxId: syncBranch.sandboxId || undefined,
+                  messages: [],
+                }
+              }),
+            }
+          }
+          // New repo from sync
+          return {
+            id: syncRepo.id,
+            name: syncRepo.name,
+            owner: syncRepo.owner,
+            avatar: syncRepo.avatar || "",
+            defaultBranch: syncRepo.defaultBranch,
+            branches: syncRepo.branches.map((b) => ({
+              id: b.id,
+              name: b.name,
+              status: b.status as Branch["status"],
+              baseBranch: b.baseBranch || "main",
+              prUrl: b.prUrl || undefined,
+              sandboxId: b.sandboxId || undefined,
+              messages: [],
+            })),
           }
         })
-        .catch(() => {})
+        return newRepos
+      })
+    } else {
+      // No repo-level changes, check for branch-level changes
+      for (const syncRepo of data.repos) {
+        const lastRepo = lastRepoMap.get(syncRepo.id)
+        if (!lastRepo) continue
+
+        const lastBranchMap = new Map(lastRepo.branches.map((b) => [b.id, b]))
+        const currentBranchMap = new Map(syncRepo.branches.map((b) => [b.id, b]))
+
+        // Check for branch additions/removals
+        const branchesChanged =
+          syncRepo.branches.length !== lastRepo.branches.length ||
+          syncRepo.branches.some((b) => !lastBranchMap.has(b.id)) ||
+          lastRepo.branches.some((b) => !currentBranchMap.has(b.id))
+
+        if (branchesChanged) {
+          // Update this repo's branches
+          setRepos((prev) =>
+            prev.map((r) => {
+              if (r.id !== syncRepo.id) return r
+              return {
+                ...r,
+                branches: syncRepo.branches.map((syncBranch) => {
+                  const existingBranch = r.branches.find((b) => b.id === syncBranch.id)
+                  if (existingBranch) {
+                    return {
+                      ...existingBranch,
+                      status: syncBranch.status as Branch["status"],
+                      prUrl: syncBranch.prUrl || undefined,
+                    }
+                  }
+                  return {
+                    id: syncBranch.id,
+                    name: syncBranch.name,
+                    status: syncBranch.status as Branch["status"],
+                    baseBranch: syncBranch.baseBranch || "main",
+                    prUrl: syncBranch.prUrl || undefined,
+                    sandboxId: syncBranch.sandboxId || undefined,
+                    messages: [],
+                  }
+                }),
+              }
+            })
+          )
+        } else {
+          // Check for individual branch updates (status, prUrl, messages)
+          for (const syncBranch of syncRepo.branches) {
+            const lastBranch = lastBranchMap.get(syncBranch.id)
+            if (!lastBranch) continue
+
+            // Status change
+            if (lastBranch.status !== syncBranch.status) {
+              setRepos((prev) =>
+                prev.map((r) => ({
+                  ...r,
+                  branches: r.branches.map((b) =>
+                    b.id === syncBranch.id ? { ...b, status: syncBranch.status as Branch["status"] } : b
+                  ),
+                }))
+              )
+            }
+
+            // PR URL change
+            if (!lastBranch.prUrl && syncBranch.prUrl) {
+              setRepos((prev) =>
+                prev.map((r) => ({
+                  ...r,
+                  branches: r.branches.map((b) =>
+                    b.id === syncBranch.id ? { ...b, prUrl: syncBranch.prUrl || undefined } : b
+                  ),
+                }))
+              )
+            }
+
+            // New message detection
+            const lastKnownMessageId = lastMessageIdsRef.current.get(syncBranch.id)
+            if (syncBranch.lastMessageId && syncBranch.lastMessageId !== lastKnownMessageId) {
+              lastMessageIdsRef.current.set(syncBranch.id, syncBranch.lastMessageId)
+
+              // Mark as unread if not active branch
+              if (syncBranch.id !== activeBranchIdRef.current) {
+                setRepos((prev) =>
+                  prev.map((r) => ({
+                    ...r,
+                    branches: r.branches.map((b) =>
+                      b.id === syncBranch.id ? { ...b, unread: true } : b
+                    ),
+                  }))
+                )
+              } else {
+                // Reload messages for active branch
+                fetch(`/api/branches/messages?branchId=${syncBranch.id}`)
+                  .then((r) => r.json())
+                  .then((msgData) => {
+                    if (msgData.messages) {
+                      setRepos((prev) =>
+                        prev.map((r) => ({
+                          ...r,
+                          branches: r.branches.map((b) => {
+                            if (b.id !== syncBranch.id) return b
+                            return {
+                              ...b,
+                              messages: msgData.messages.map((m: DbMessage) => ({
+                                id: m.id,
+                                role: m.role as "user" | "assistant",
+                                content: m.content,
+                                toolCalls: m.toolCalls as Message["toolCalls"],
+                                timestamp: m.timestamp || "",
+                                commitHash: m.commitHash || undefined,
+                                commitMessage: m.commitMessage || undefined,
+                              })),
+                            }
+                          }),
+                        }))
+                      )
+                    }
+                  })
+                  .catch(() => {})
+              }
+            }
+          }
+        }
+      }
     }
-  }, [activeBranchId])
+
+    // Update message ID tracking for next sync
+    for (const repo of data.repos) {
+      for (const branch of repo.branches) {
+        lastMessageIdsRef.current.set(branch.id, branch.lastMessageId)
+      }
+    }
+  }, [])
 
   useCrossDeviceSync({
-    repoId: activeRepoId,
-    enabled: loaded && !!activeRepoId,
+    enabled: loaded,
     interval: 5000,
-    onBranchStatusChange: handleSyncBranchStatusChange,
-    onBranchPrUrlChange: handleSyncBranchPrUrlChange,
-    onNewMessage: handleSyncNewMessage,
+    onSyncData: handleSyncData,
   })
 
   // Loading state

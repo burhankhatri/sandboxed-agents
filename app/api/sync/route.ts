@@ -1,40 +1,38 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 // Lightweight sync endpoint for cross-device state synchronization
-// Returns branch statuses, last message info, and branch list changes
-export async function GET(req: NextRequest) {
+// Returns all repos with branch statuses, last message info, etc.
+export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { searchParams } = new URL(req.url)
-  const repoId = searchParams.get("repoId")
-
-  if (!repoId) {
-    return NextResponse.json({ error: "repoId required" }, { status: 400 })
-  }
-
   try {
-    // Verify user owns this repo
-    const repo = await prisma.repo.findFirst({
+    // Get all repos for user with branch info
+    const repos = await prisma.repo.findMany({
       where: {
-        id: repoId,
         userId: session.user.id,
       },
       select: {
         id: true,
+        name: true,
+        owner: true,
+        avatar: true,
+        defaultBranch: true,
         branches: {
           select: {
             id: true,
             name: true,
             status: true,
+            baseBranch: true,
             prUrl: true,
             sandbox: {
               select: {
+                sandboxId: true,
                 status: true,
               },
             },
@@ -51,22 +49,26 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    if (!repo) {
-      return NextResponse.json({ error: "Repo not found" }, { status: 404 })
-    }
-
     // Return compact sync data
     const syncData = {
-      repoId: repo.id,
       timestamp: Date.now(),
-      branches: repo.branches.map((b) => ({
-        id: b.id,
-        name: b.name,
-        status: b.status,
-        prUrl: b.prUrl,
-        sandboxStatus: b.sandbox?.status || null,
-        lastMessageId: b.messages[0]?.id || null,
-        lastMessageAt: b.messages[0]?.createdAt?.getTime() || null,
+      repos: repos.map((r) => ({
+        id: r.id,
+        name: r.name,
+        owner: r.owner,
+        avatar: r.avatar,
+        defaultBranch: r.defaultBranch,
+        branches: r.branches.map((b) => ({
+          id: b.id,
+          name: b.name,
+          status: b.status,
+          baseBranch: b.baseBranch,
+          prUrl: b.prUrl,
+          sandboxId: b.sandbox?.sandboxId || null,
+          sandboxStatus: b.sandbox?.status || null,
+          lastMessageId: b.messages[0]?.id || null,
+          lastMessageAt: b.messages[0]?.createdAt?.getTime() || null,
+        })),
       })),
     }
 

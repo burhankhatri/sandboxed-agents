@@ -1,30 +1,35 @@
 import { Daytona } from "@daytonaio/sdk"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { checkQuota } from "@/lib/quota"
-import { decrypt } from "@/lib/encryption"
 import { generateSandboxName } from "@/lib/sandbox-utils"
 import { CODING_AGENT_SCRIPT } from "@/lib/coding-agent-script"
+import {
+  requireAuth,
+  isAuthError,
+  getDaytonaApiKey,
+  isDaytonaKeyError,
+  badRequest,
+  unauthorized,
+  decryptUserCredentials,
+} from "@/lib/api-helpers"
 
 export const maxDuration = 300 // 5 minute timeout for sandbox creation
 
 export async function POST(req: Request) {
   // 1. Authenticate
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { repoId, repoOwner, repoName, baseBranch, newBranch, startCommit } = body
 
   if (!repoOwner || !repoName || !newBranch) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 })
+    return badRequest("Missing required fields")
   }
 
   // 2. Check quota
-  const quota = await checkQuota(session.user.id)
+  const quota = await checkQuota(userId)
   if (!quota.allowed) {
     return Response.json({
       error: "Quota exceeded",
@@ -33,28 +38,24 @@ export async function POST(req: Request) {
   }
 
   // 3. Get credentials
-  const daytonaApiKey = process.env.DAYTONA_API_KEY
-  if (!daytonaApiKey) {
-    return Response.json({ error: "Server configuration error: Daytona API key not set" }, { status: 500 })
-  }
+  const daytonaApiKey = getDaytonaApiKey()
+  if (isDaytonaKeyError(daytonaApiKey)) return daytonaApiKey
 
   // Get GitHub token from NextAuth
   const account = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "github" },
+    where: { userId, provider: "github" },
   })
   const githubToken = account?.access_token
   if (!githubToken) {
-    return Response.json({ error: "GitHub token not found. Please re-authenticate." }, { status: 401 })
+    return unauthorized()
   }
 
   // Get user's Anthropic credentials
   const userCredentials = await prisma.userCredentials.findUnique({
-    where: { userId: session.user.id },
+    where: { userId },
   })
 
-  const anthropicAuthType = userCredentials?.anthropicAuthType || "api-key"
-  const anthropicApiKey = userCredentials?.anthropicApiKey ? decrypt(userCredentials.anthropicApiKey) : null
-  const anthropicAuthToken = userCredentials?.anthropicAuthToken ? decrypt(userCredentials.anthropicAuthToken) : null
+  const { anthropicApiKey, anthropicAuthToken, anthropicAuthType } = decryptUserCredentials(userCredentials)
   const sandboxAutoStopInterval = userCredentials?.sandboxAutoStopInterval ?? 5
 
   const hasAnthropicCredential =
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     (anthropicAuthType !== "claude-max" && anthropicApiKey)
 
   if (!hasAnthropicCredential) {
-    return Response.json({ error: "Anthropic credentials not configured. Please add them in Settings." }, { status: 400 })
+    return badRequest("Anthropic credentials not configured. Please add them in Settings.")
   }
 
   const encoder = new TextEncoder()
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
         send({ type: "progress", message: "Creating sandbox..." })
 
         const daytona = new Daytona({ apiKey: daytonaApiKey })
-        const sandboxName = generateSandboxName(session.user.id)
+        const sandboxName = generateSandboxName(userId)
 
         const sandbox = await daytona.create({
           name: sandboxName,
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
             "sandboxed-agents": "true",
             "repo": `${repoOwner}/${repoName}`,
             "branch": newBranch,
-            "userId": session.user.id,
+            "userId": userId,
           },
           ...(anthropicAuthType !== "claude-max" && anthropicApiKey && {
             envVars: { ANTHROPIC_API_KEY: anthropicApiKey },
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
         await sandbox.git.clone(cloneUrl, repoPath, base, undefined, "x-access-token", githubToken)
 
         // Set up git author config from GitHub user
-        let gitName = session.user.name || "Sandboxed Agent"
+        let gitName = "Sandboxed Agent"
         let gitEmail = "noreply@example.com"
         try {
           const ghRes = await fetch("https://api.github.com/user", {
@@ -198,7 +199,7 @@ export async function POST(req: Request) {
         let dbRepo = await prisma.repo.findUnique({
           where: {
             userId_owner_name: {
-              userId: session.user.id,
+              userId: userId,
               owner: repoOwner,
               name: repoName,
             },
@@ -215,7 +216,7 @@ export async function POST(req: Request) {
           // Create repo if it doesn't exist
           dbRepo = await prisma.repo.create({
             data: {
-              userId: session.user.id,
+              userId: userId,
               owner: repoOwner,
               name: repoName,
               defaultBranch: baseBranch || "main",
@@ -239,7 +240,7 @@ export async function POST(req: Request) {
           data: {
             sandboxId: sandbox.id,
             sandboxName,
-            userId: session.user.id,
+            userId: userId,
             branchId: branchRecord.id,
             contextId: ctx.id,
             previewUrlPattern,

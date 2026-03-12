@@ -1,27 +1,29 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  requireAuth,
+  isAuthError,
+  getRepoWithAuth,
+  getBranchWithAuth,
+  badRequest,
+  notFound,
+} from "@/lib/api-helpers"
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { repoId, name, baseBranch, startCommit } = body
 
   if (!repoId || !name) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 })
+    return badRequest("Missing required fields")
   }
 
   // Verify repo ownership
-  const repo = await prisma.repo.findUnique({
-    where: { id: repoId },
-  })
-
-  if (!repo || repo.userId !== session.user.id) {
-    return Response.json({ error: "Repo not found" }, { status: 404 })
+  const repo = await getRepoWithAuth(repoId, userId)
+  if (!repo) {
+    return notFound("Repo not found")
   }
 
   // Check if branch already exists
@@ -62,26 +64,21 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const { searchParams } = new URL(req.url)
   const branchId = searchParams.get("id")
 
   if (!branchId) {
-    return Response.json({ error: "Missing branch ID" }, { status: 400 })
+    return badRequest("Missing branch ID")
   }
 
   // Verify ownership through repo
-  const branch = await prisma.branch.findUnique({
-    where: { id: branchId },
-    include: { repo: true },
-  })
-
-  if (!branch || branch.repo.userId !== session.user.id) {
-    return Response.json({ error: "Branch not found" }, { status: 404 })
+  const branch = await getBranchWithAuth(branchId, userId)
+  if (!branch) {
+    return notFound("Branch not found")
   }
 
   await prisma.branch.delete({
@@ -93,26 +90,21 @@ export async function DELETE(req: Request) {
 
 // Update branch status/metadata
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { branchId, status, prUrl, name, draftPrompt } = body
 
   if (!branchId) {
-    return Response.json({ error: "Missing branch ID" }, { status: 400 })
+    return badRequest("Missing branch ID")
   }
 
   // Verify ownership
-  const branch = await prisma.branch.findUnique({
-    where: { id: branchId },
-    include: { repo: true },
-  })
-
-  if (!branch || branch.repo.userId !== session.user.id) {
-    return Response.json({ error: "Branch not found" }, { status: 404 })
+  const branch = await getBranchWithAuth(branchId, userId)
+  if (!branch) {
+    return notFound("Branch not found")
   }
 
   const updatedBranch = await prisma.branch.update({

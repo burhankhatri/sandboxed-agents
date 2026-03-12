@@ -1,25 +1,27 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { encrypt } from "@/lib/encryption"
+import {
+  requireAuth,
+  isAuthError,
+  badRequest,
+} from "@/lib/api-helpers"
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { anthropicApiKey, anthropicAuthType, anthropicAuthToken, sandboxAutoStopInterval } = body
 
   if (!anthropicAuthType || !["api-key", "claude-max"].includes(anthropicAuthType)) {
-    return Response.json({ error: "Invalid auth type" }, { status: 400 })
+    return badRequest("Invalid auth type")
   }
 
   // Validate sandboxAutoStopInterval if provided
   if (sandboxAutoStopInterval !== undefined) {
     if (typeof sandboxAutoStopInterval !== "number" || sandboxAutoStopInterval < 5 || sandboxAutoStopInterval > 20) {
-      return Response.json({ error: "Invalid auto-stop interval. Must be between 5 and 20 minutes." }, { status: 400 })
+      return badRequest("Invalid auto-stop interval. Must be between 5 and 20 minutes.")
     }
   }
 
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
   const encryptedAuthToken = anthropicAuthToken ? encrypt(anthropicAuthToken) : null
 
   await prisma.userCredentials.upsert({
-    where: { userId: session.user.id },
+    where: { userId },
     update: {
       anthropicApiKey: encryptedApiKey,
       anthropicAuthType,
@@ -36,7 +38,7 @@ export async function POST(req: Request) {
       ...(sandboxAutoStopInterval !== undefined && { sandboxAutoStopInterval }),
     },
     create: {
-      userId: session.user.id,
+      userId,
       anthropicApiKey: encryptedApiKey,
       anthropicAuthType,
       anthropicAuthToken: encryptedAuthToken,
@@ -48,13 +50,12 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   await prisma.userCredentials.deleteMany({
-    where: { userId: session.user.id },
+    where: { userId },
   })
 
   return Response.json({ success: true })

@@ -1,15 +1,19 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  requireAuth,
+  isAuthError,
+  getBranchWithAuth,
+  badRequest,
+  notFound,
+} from "@/lib/api-helpers"
 
 // Prevent Next.js from caching this route - always fetch fresh data
 export const dynamic = "force-dynamic"
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const { searchParams } = new URL(req.url)
   const branchId = searchParams.get("branchId")
@@ -17,17 +21,13 @@ export async function GET(req: Request) {
   const limit = Math.min(parseInt(searchParams.get("limit") || "100"), 500) // Default 100, max 500
 
   if (!branchId) {
-    return Response.json({ error: "Missing branch ID" }, { status: 400 })
+    return badRequest("Missing branch ID")
   }
 
   // Verify ownership
-  const branch = await prisma.branch.findUnique({
-    where: { id: branchId },
-    include: { repo: true },
-  })
-
-  if (!branch || branch.repo.userId !== session.user.id) {
-    return Response.json({ error: "Branch not found" }, { status: 404 })
+  const branch = await getBranchWithAuth(branchId, userId)
+  if (!branch) {
+    return notFound("Branch not found")
   }
 
   const messages = await prisma.message.findMany({
@@ -58,26 +58,21 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { branchId, role, content, toolCalls, contentBlocks, timestamp, commitHash, commitMessage } = body
 
   if (!branchId || !role) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 })
+    return badRequest("Missing required fields")
   }
 
   // Verify ownership
-  const branch = await prisma.branch.findUnique({
-    where: { id: branchId },
-    include: { repo: true },
-  })
-
-  if (!branch || branch.repo.userId !== session.user.id) {
-    return Response.json({ error: "Branch not found" }, { status: 404 })
+  const branch = await getBranchWithAuth(branchId, userId)
+  if (!branch) {
+    return notFound("Branch not found")
   }
 
   const message = await prisma.message.create({
@@ -98,16 +93,15 @@ export async function POST(req: Request) {
 
 // Update a message (for streaming updates)
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const authResult = await requireAuth()
+  if (isAuthError(authResult)) return authResult
+  const { userId } = authResult
 
   const body = await req.json()
   const { messageId, content, toolCalls, contentBlocks } = body
 
   if (!messageId) {
-    return Response.json({ error: "Missing message ID" }, { status: 400 })
+    return badRequest("Missing message ID")
   }
 
   // Verify ownership through branch -> repo
@@ -116,8 +110,8 @@ export async function PATCH(req: Request) {
     include: { branch: { include: { repo: true } } },
   })
 
-  if (!message || message.branch.repo.userId !== session.user.id) {
-    return Response.json({ error: "Message not found" }, { status: 404 })
+  if (!message || message.branch.repo.userId !== userId) {
+    return notFound("Message not found")
   }
 
   const updatedMessage = await prisma.message.update({

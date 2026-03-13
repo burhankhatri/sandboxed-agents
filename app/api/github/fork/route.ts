@@ -1,16 +1,18 @@
 import { requireGitHubAuth, isGitHubAuthError, badRequest, internalError } from "@/lib/api-helpers"
 import { forkRepo } from "@/lib/github-client"
+import { forkRepoSchema, validateBody, isValidationError } from "@/lib/schemas"
 
 export async function POST(req: Request) {
   const auth = await requireGitHubAuth()
   if (isGitHubAuthError(auth)) return auth
 
   const body = await req.json()
-  const { owner, name } = body
-
-  if (!owner || !name) {
-    return badRequest("Missing required fields")
+  const validation = validateBody(body, forkRepoSchema)
+  if (isValidationError(validation)) {
+    return badRequest(validation.error)
   }
+
+  const { owner, name } = validation.data
 
   try {
     const data = await forkRepo(auth.token, owner, name)

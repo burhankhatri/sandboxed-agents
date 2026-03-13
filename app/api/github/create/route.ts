@@ -1,16 +1,18 @@
 import { requireGitHubAuth, isGitHubAuthError, badRequest, internalError } from "@/lib/api-helpers"
 import { createRepo } from "@/lib/github-client"
+import { createRepoSchema, validateBody, isValidationError } from "@/lib/schemas"
 
 export async function POST(req: Request) {
   const auth = await requireGitHubAuth()
   if (isGitHubAuthError(auth)) return auth
 
   const body = await req.json()
-  const { name, description, isPrivate } = body
-
-  if (!name) {
-    return badRequest("Missing required fields")
+  const validation = validateBody(body, createRepoSchema)
+  if (isValidationError(validation)) {
+    return badRequest(validation.error)
   }
+
+  const { name, description, isPrivate } = validation.data
 
   try {
     const data = await createRepo(auth.token, { name, description, isPrivate })

@@ -1,17 +1,19 @@
 import { prisma } from "@/lib/prisma"
 import { requireGitHubAuth, isGitHubAuthError, badRequest, internalError } from "@/lib/api-helpers"
 import { compareBranches, createPullRequest, isGitHubApiError } from "@/lib/github-client"
+import { createPRSchema, validateBody, isValidationError } from "@/lib/schemas"
 
 export async function POST(req: Request) {
   const auth = await requireGitHubAuth()
   if (isGitHubAuthError(auth)) return auth
 
   const body = await req.json()
-  const { owner, repo, head, base } = body
-
-  if (!owner || !repo || !head || !base) {
-    return badRequest("Missing required fields")
+  const validation = validateBody(body, createPRSchema)
+  if (isValidationError(validation)) {
+    return badRequest(validation.error)
   }
+
+  const { owner, repo, head, base } = validation.data
 
   try {
     // Get commits between base and head for PR body

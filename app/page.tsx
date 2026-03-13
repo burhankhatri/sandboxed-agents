@@ -288,10 +288,8 @@ export default function Home() {
                   repoOwner={activeRepo.owner}
                   gitHistoryOpen={gitHistoryOpen}
                   onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
-                  onAddMessage={(msg) => handleAddMessage(activeBranch.id, msg)}
-                  onUpdateMessage={(messageId, updates) =>
-                    handleUpdateMessage(activeBranch.id, messageId, updates)
-                  }
+                  onAddMessage={handleAddMessage}
+                  onUpdateMessage={handleUpdateMessage}
                   onUpdateBranch={handleUpdateBranch}
                   onSaveDraftForBranch={handleSaveDraftForBranch}
                   onForceSave={() => {}}
@@ -318,10 +316,8 @@ export default function Home() {
               repoOwner={activeRepo.owner}
               gitHistoryOpen={gitHistoryOpen}
               onToggleGitHistory={() => setGitHistoryOpen((v) => !v)}
-              onAddMessage={(msg) => handleAddMessage(activeBranch.id, msg)}
-              onUpdateMessage={(messageId, updates) =>
-                handleUpdateMessage(activeBranch.id, messageId, updates)
-              }
+              onAddMessage={handleAddMessage}
+              onUpdateMessage={handleUpdateMessage}
               onUpdateBranch={handleUpdateBranch}
               onSaveDraftForBranch={handleSaveDraftForBranch}
               onForceSave={() => {}}

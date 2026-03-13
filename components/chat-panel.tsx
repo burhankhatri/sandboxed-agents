@@ -35,8 +35,10 @@ interface ChatPanelProps {
   repoOwner: string
   gitHistoryOpen: boolean
   onToggleGitHistory: () => void
-  onAddMessage: (message: Message) => Promise<string>
-  onUpdateMessage: (messageId: string, updates: Partial<Message>) => void
+  /** Add message to a specific branch - branchId param ensures correct branch even during branch switches */
+  onAddMessage: (branchId: string, message: Message) => Promise<string>
+  /** Update message in a specific branch - branchId param ensures correct branch even during branch switches */
+  onUpdateMessage: (branchId: string, messageId: string, updates: Partial<Message>) => void
   onUpdateBranch: (branchId: string, updates: Partial<Branch>) => void
   onSaveDraftForBranch?: (branchId: string, draftPrompt: string) => void
   onForceSave: () => void
@@ -141,7 +143,7 @@ export function ChatPanel({
       content: prompt,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
-    await onAddMessage(userMsg)
+    await onAddMessage(branch.id, userMsg)
     setInput("")
 
     onUpdateBranch(branch.id, { status: BRANCH_STATUS.RUNNING, draftPrompt: "" })
@@ -153,7 +155,7 @@ export function ChatPanel({
       toolCalls: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
-    const messageId = await onAddMessage(assistantMsg)
+    const messageId = await onAddMessage(branch.id, assistantMsg)
     currentMessageIdRef.current = messageId
 
     try {
@@ -181,7 +183,7 @@ export function ChatPanel({
       startPolling(messageId, executionId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      onUpdateMessage(messageId, { content: `Error: ${message}` })
+      onUpdateMessage(branch.id, messageId, { content: `Error: ${message}` })
       onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
       currentMessageIdRef.current = null
       currentExecutionIdRef.current = null

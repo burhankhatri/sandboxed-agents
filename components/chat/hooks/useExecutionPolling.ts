@@ -35,6 +35,7 @@ export function useExecutionPolling({
   globalActiveBranchIdRef,
 }: UseExecutionPollingOptions) {
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const resumeRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const currentExecutionIdRef = useRef<string | null>(null)
   const currentMessageIdRef = useRef<string | null>(null)
   const startingCommitRef = useRef<string | null>(branch.startCommit || null)
@@ -403,6 +404,7 @@ export function useExecutionPolling({
             .then((r) => r.json())
             .then((execData) => {
               if (execData.execution && execData.execution.status === EXECUTION_STATUS.RUNNING) {
+                if (pollingRef.current) return
                 console.log(LOG_PREFIX, "resume from execution/active", {
                   branchId: branch.id,
                   messageId: execData.execution.messageId,
@@ -417,16 +419,47 @@ export function useExecutionPolling({
                 currentMessages && currentMessages.length > 0
                   ? [...currentMessages].reverse().find((m) => m.role === "assistant" && !m.commitHash)
                   : null
-              if (lastAssistantMsg) {
-                console.log(LOG_PREFIX, "resume from last message", {
-                  branchId: branch.id,
-                  messageId: lastAssistantMsg.id,
-                })
-                currentMessageIdRef.current = lastAssistantMsg.id
-                startPollingRef.current(lastAssistantMsg.id)
-              } else {
+              if (!lastAssistantMsg) {
                 onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
+                return
               }
+              // Execution row may not exist yet if user switched immediately after send; retry once
+              const retryResume = () => {
+                if (pollingRef.current) return
+                fetch("/api/agent/execution/active", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ branchId: branch.id }),
+                })
+                  .then((r) => r.json())
+                  .then((retryData) => {
+                    if (pollingRef.current) return
+                    if (retryData.execution && retryData.execution.status === EXECUTION_STATUS.RUNNING) {
+                      console.log(LOG_PREFIX, "resume from execution/active (retry)", {
+                        branchId: branch.id,
+                        messageId: retryData.execution.messageId,
+                        executionId: retryData.execution.executionId,
+                      })
+                      currentMessageIdRef.current = retryData.execution.messageId
+                      currentExecutionIdRef.current = retryData.execution.executionId
+                      startPollingRef.current(retryData.execution.messageId, retryData.execution.executionId)
+                      return
+                    }
+                    console.log(LOG_PREFIX, "resume from last message", {
+                      branchId: branch.id,
+                      messageId: lastAssistantMsg.id,
+                    })
+                    currentMessageIdRef.current = lastAssistantMsg.id
+                    startPollingRef.current(lastAssistantMsg.id)
+                  })
+                  .catch(() => {
+                    if (pollingRef.current) return
+                    currentMessageIdRef.current = lastAssistantMsg.id
+                    startPollingRef.current(lastAssistantMsg.id)
+                  })
+              }
+              if (resumeRetryTimeoutRef.current) clearTimeout(resumeRetryTimeoutRef.current)
+              resumeRetryTimeoutRef.current = setTimeout(retryResume, 700)
             })
             .catch(() => {
               onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
@@ -434,6 +467,12 @@ export function useExecutionPolling({
         }
       })
       .catch(() => {})
+    return () => {
+      if (resumeRetryTimeoutRef.current) {
+        clearTimeout(resumeRetryTimeoutRef.current)
+        resumeRetryTimeoutRef.current = null
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch.id, branch.sandboxId])
 

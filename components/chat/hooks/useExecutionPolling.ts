@@ -179,6 +179,14 @@ export function useExecutionPolling({
           // Use pollingBranchIdRef to ensure updates go to the correct branch
           const targetBranchId = pollingBranchIdRef.current
           if (targetBranchId) {
+            console.log(LOG_PREFIX, "message update", {
+              branchId: targetBranchId,
+              messageId,
+              status: data.status,
+              hasContent: !!data.content,
+              toolCallsCount: (data.toolCalls || []).length,
+              contentBlocksCount: (data.contentBlocks || []).length,
+            })
             onUpdateMessage(targetBranchId, messageId, {
               content: data.content || "",
               toolCalls: toolCallsWithIds,
@@ -374,7 +382,7 @@ export function useExecutionPolling({
 
     const currentStatus = branch.status
     const currentMessages = branch.messages
-    console.log("[execution-poll] resume check", { branchId: branch.id, status: currentStatus })
+    console.log(LOG_PREFIX, "resume check", { branchId: branch.id, status: currentStatus })
 
     fetch("/api/sandbox/status", {
       method: "POST",
@@ -386,40 +394,43 @@ export function useExecutionPolling({
         if (data.state && data.state !== "started") {
           onUpdateBranch(branch.id, { status: BRANCH_STATUS.STOPPED })
         } else if (currentStatus === BRANCH_STATUS.RUNNING && !pollingRef.current) {
-          if (currentMessages && currentMessages.length > 0) {
-            const lastAssistantMsg = [...currentMessages].reverse().find(m => m.role === "assistant" && !m.commitHash)
-            if (lastAssistantMsg) {
-              console.log("[execution-poll] resume from last message", { branchId: branch.id, messageId: lastAssistantMsg.id })
-              currentMessageIdRef.current = lastAssistantMsg.id
-              startPollingRef.current(lastAssistantMsg.id)
-            } else {
-              onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
-            }
-          } else {
-            fetch("/api/agent/execution/active", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ branchId: branch.id }),
-            })
-              .then((r) => r.json())
-              .then((execData) => {
-                if (execData.execution && execData.execution.status === EXECUTION_STATUS.RUNNING) {
-                  console.log("[execution-poll] resume from execution/active", {
-                    branchId: branch.id,
-                    messageId: execData.execution.messageId,
-                    executionId: execData.execution.executionId,
-                  })
-                  currentMessageIdRef.current = execData.execution.messageId
-                  currentExecutionIdRef.current = execData.execution.executionId
-                  startPollingRef.current(execData.execution.messageId, execData.execution.executionId)
-                } else {
-                  onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
-                }
-              })
-              .catch(() => {
+          // Prefer execution/active so we get executionId and avoid 404s / duplicate poll loops
+          fetch("/api/agent/execution/active", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ branchId: branch.id }),
+          })
+            .then((r) => r.json())
+            .then((execData) => {
+              if (execData.execution && execData.execution.status === EXECUTION_STATUS.RUNNING) {
+                console.log(LOG_PREFIX, "resume from execution/active", {
+                  branchId: branch.id,
+                  messageId: execData.execution.messageId,
+                  executionId: execData.execution.executionId,
+                })
+                currentMessageIdRef.current = execData.execution.messageId
+                currentExecutionIdRef.current = execData.execution.executionId
+                startPollingRef.current(execData.execution.messageId, execData.execution.executionId)
+                return
+              }
+              const lastAssistantMsg =
+                currentMessages && currentMessages.length > 0
+                  ? [...currentMessages].reverse().find((m) => m.role === "assistant" && !m.commitHash)
+                  : null
+              if (lastAssistantMsg) {
+                console.log(LOG_PREFIX, "resume from last message", {
+                  branchId: branch.id,
+                  messageId: lastAssistantMsg.id,
+                })
+                currentMessageIdRef.current = lastAssistantMsg.id
+                startPollingRef.current(lastAssistantMsg.id)
+              } else {
                 onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
-              })
-          }
+              }
+            })
+            .catch(() => {
+              onUpdateBranch(branch.id, { status: BRANCH_STATUS.IDLE })
+            })
         }
       })
       .catch(() => {})

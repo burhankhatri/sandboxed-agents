@@ -74,8 +74,16 @@ export function useBranchOperations({
   const handleAddMessage = useCallback(async (branchId: string, message: Message): Promise<string> => {
     if (!activeRepo) return message.id
 
-    // Add message to local state immediately with temporary ID
-    setRepos((prev) => addMessageToBranch(prev, activeRepo.id, branchId, message))
+    const now = Date.now()
+    // Add message and bump branch to top of list (lastActivityTs drives sort order)
+    setRepos((prev) =>
+      updateBranchInRepo(
+        addMessageToBranch(prev, activeRepo.id, branchId, message),
+        activeRepo.id,
+        branchId,
+        { lastActivity: "now", lastActivityTs: now }
+      )
+    )
 
     // Save message to database and get the real DB ID
     try {

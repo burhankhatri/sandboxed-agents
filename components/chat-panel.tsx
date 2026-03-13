@@ -146,7 +146,13 @@ export function ChatPanel({
     await onAddMessage(branch.id, userMsg)
     setInput("")
 
-    onUpdateBranch(branch.id, { status: BRANCH_STATUS.RUNNING, draftPrompt: "" })
+    const now = Date.now()
+    onUpdateBranch(branch.id, {
+      status: BRANCH_STATUS.RUNNING,
+      draftPrompt: "",
+      lastActivity: "now",
+      lastActivityTs: now,
+    })
 
     const assistantMsg: Message = {
       id: generateId(),

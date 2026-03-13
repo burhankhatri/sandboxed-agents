@@ -53,19 +53,12 @@ export function useExecutionPolling({
     }
   }, [branch.id, branch.startCommit])
 
-  // Ref to track pending setTimeout for polling startup
-  const pendingPollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
         pollingRef.current = null
-      }
-      if (pendingPollTimeoutRef.current) {
-        clearTimeout(pendingPollTimeoutRef.current)
-        pendingPollTimeoutRef.current = null
       }
     }
   }, [])
@@ -82,12 +75,6 @@ export function useExecutionPolling({
     if (pollingRef.current) {
       clearInterval(pollingRef.current)
       pollingRef.current = null
-    }
-
-    // Clear any pending poll timeout (prevents double-start race condition)
-    if (pendingPollTimeoutRef.current) {
-      clearTimeout(pendingPollTimeoutRef.current)
-      pendingPollTimeoutRef.current = null
     }
 
     let notFoundRetries = 0
@@ -298,13 +285,8 @@ export function useExecutionPolling({
       }
     }
 
-    // Slight delay to match previous behavior and avoid racing with
-    // immediate sync updates.
-    pendingPollTimeoutRef.current = setTimeout(() => {
-      pendingPollTimeoutRef.current = null
-      poll()
-      pollingRef.current = setInterval(poll, 500)
-    }, 150)
+    poll()
+    pollingRef.current = setInterval(poll, 500)
   // Note: branch.sandboxId, branch.name, and branch.messages are accessed via refs to avoid stale closures
   // This is critical - including branch.messages in deps causes the callback to be recreated on every
   // message update, which clears the polling interval and causes streaming content to disappear
@@ -314,13 +296,10 @@ export function useExecutionPolling({
 
   // Stop polling and update message
   const stopPolling = useCallback(() => {
-    // Stopping marks the branch idle and appends a "[Stopped by user]" note
-    // to the current assistant message, matching previous UX.
-    if (pendingPollTimeoutRef.current) {
-      clearTimeout(pendingPollTimeoutRef.current)
-      pendingPollTimeoutRef.current = null
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
     }
-
     if (currentMessageIdRef.current) {
       // Use ref to get current messages to avoid dependency issues
       const lastMsg = branchMessagesRef.current.find(m => m.id === currentMessageIdRef.current)
@@ -342,8 +321,7 @@ export function useExecutionPolling({
   // Check and resume polling on mount/branch switch
   useEffect(() => {
     if (!branch.sandboxId) return
-    // Skip if polling is already active or pending
-    if (pollingRef.current || pendingPollTimeoutRef.current) return
+    if (pollingRef.current) return
 
     const currentStatus = branch.status
     const currentMessages = branch.messages
@@ -393,7 +371,6 @@ export function useExecutionPolling({
   }, [branch.id, branch.sandboxId])
 
   return {
-    pollingRef,
     currentExecutionIdRef,
     currentMessageIdRef,
     startPolling,

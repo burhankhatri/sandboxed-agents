@@ -116,7 +116,3 @@ export async function startAgentPoller(options: StartAgentPollerOptions): Promis
   return pollerPromise
 }
 
-export function isAgentPollerActive(agentExecutionId: string): boolean {
-  return activePollers.has(agentExecutionId)
-}
-

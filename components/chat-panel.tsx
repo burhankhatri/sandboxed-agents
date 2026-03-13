@@ -6,8 +6,9 @@ import { defaultAgentModel } from "@/lib/types"
 import { generateId } from "@/lib/store"
 import { BRANCH_STATUS } from "@/lib/constants"
 import { Terminal } from "lucide-react"
-import { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback, useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { SwitchAgentDialog } from "@/components/switch-agent-dialog"
 
 // Import hooks
 import {
@@ -66,6 +67,9 @@ export function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // State for agent switch dialog
+  const [pendingAgentSwitch, setPendingAgentSwitch] = useState<Agent | null>(null)
 
   // Custom hooks
   const { input, setInput, isNearBottomRef } = useDraftSync({

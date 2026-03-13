@@ -1,27 +1,15 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { requireGitHubAuth, isGitHubAuthError, badRequest, internalError } from "@/lib/api-helpers"
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const auth = await requireGitHubAuth()
+  if (isGitHubAuthError(auth)) return auth
 
   const body = await req.json()
   const { owner, repo, head, base } = body
 
   if (!owner || !repo || !head || !base) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 })
-  }
-
-  const account = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "github" },
-  })
-  const token = account?.access_token
-
-  if (!token) {
-    return Response.json({ error: "GitHub token not found" }, { status: 401 })
+    return badRequest("Missing required fields")
   }
 
   try {
@@ -30,7 +18,7 @@ export async function POST(req: Request) {
       `https://api.github.com/repos/${owner}/${repo}/compare/${base}...${head}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${auth.token}`,
           Accept: "application/vnd.github.v3+json",
         },
       }
@@ -58,7 +46,7 @@ export async function POST(req: Request) {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${auth.token}`,
           Accept: "application/vnd.github.v3+json",
         },
         body: JSON.stringify({
@@ -83,7 +71,7 @@ export async function POST(req: Request) {
         repo: {
           owner,
           name: repo,
-          userId: session.user.id,
+          userId: auth.userId,
         },
       },
     })
@@ -100,7 +88,6 @@ export async function POST(req: Request) {
       title: prData.title,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return Response.json({ error: message }, { status: 500 })
+    return internalError(error)
   }
 }

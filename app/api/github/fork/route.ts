@@ -1,34 +1,21 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { requireGitHubAuth, isGitHubAuthError, badRequest, internalError } from "@/lib/api-helpers"
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const account = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "github" },
-  })
-  const token = account?.access_token
-
-  if (!token) {
-    return Response.json({ error: "GitHub account not linked" }, { status: 401 })
-  }
+  const auth = await requireGitHubAuth()
+  if (isGitHubAuthError(auth)) return auth
 
   const body = await req.json()
   const { owner, name } = body
 
   if (!owner || !name) {
-    return Response.json({ error: "Missing required fields" }, { status: 400 })
+    return badRequest("Missing required fields")
   }
 
   try {
     const res = await fetch(`https://api.github.com/repos/${owner}/${name}/forks`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${auth.token}`,
         Accept: "application/vnd.github.v3+json",
       },
     })
@@ -48,7 +35,6 @@ export async function POST(req: Request) {
       fullName: data.full_name,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return Response.json({ error: message }, { status: 500 })
+    return internalError(error)
   }
 }

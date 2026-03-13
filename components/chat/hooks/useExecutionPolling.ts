@@ -16,7 +16,8 @@ interface UseExecutionPollingOptions {
 }
 
 /**
- * Handles polling for background agent execution status
+ * Handles polling for background agent execution status using a simple
+ * HTTP polling loop that reads snapshots from the server.
  */
 export function useExecutionPolling({
   branch,
@@ -29,7 +30,6 @@ export function useExecutionPolling({
   streamingMessageIdRef,
 }: UseExecutionPollingOptions) {
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
-  const eventSourceRef = useRef<EventSource | null>(null)
   const currentExecutionIdRef = useRef<string | null>(null)
   const currentMessageIdRef = useRef<string | null>(null)
   const startingCommitRef = useRef<string | null>(branch.startCommit || null)
@@ -59,11 +59,6 @@ export function useExecutionPolling({
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      // Close any active SSE stream and clear timers.
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
         pollingRef.current = null
@@ -75,7 +70,7 @@ export function useExecutionPolling({
     }
   }, [])
 
-  // Start streaming execution status via SSE
+  // Start polling for execution status via HTTP snapshots
   const startPolling = useCallback((messageId: string, executionId?: string) => {
     // Signal that streaming is starting (used by sync to avoid overwriting)
     if (streamingMessageIdRef) {
@@ -83,59 +78,59 @@ export function useExecutionPolling({
     }
     currentMessageIdRef.current = messageId
 
-    // Establish an EventSource connection to the SSE endpoint. We keep the
-    // existing "polling" terminology for backwards compatibility with the
-    // surrounding code.
-    const connect = () => {
-      if (!executionId) {
-        console.error("Missing executionId for SSE stream")
-        return
-      }
+    // Clear any existing polling interval
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
 
-      const url = new URL(`/api/agent/stream/${executionId}`, window.location.origin)
-      // We always resume from the start for this message; the server streams
-      // only this execution's events.
-      url.searchParams.set("lastEventId", "0")
+    // Clear any pending poll timeout (prevents double-start race condition)
+    if (pendingPollTimeoutRef.current) {
+      clearTimeout(pendingPollTimeoutRef.current)
+      pendingPollTimeoutRef.current = null
+    }
 
-      const eventSource = new EventSource(url.toString())
-      eventSourceRef.current = eventSource
+    let notFoundRetries = 0
+    const MAX_NOT_FOUND_RETRIES = 10
 
-      console.log("[useExecutionPolling] SSE connect", {
-        executionId,
-        messageId,
-        url: url.toString(),
-      })
-
-      eventSource.onopen = () => {
-        console.log("[useExecutionPolling] SSE open", {
-          executionId,
-          messageId,
-          readyState: eventSource.readyState,
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/agent/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId, executionId }),
         })
-      }
 
-      // Handle content snapshot events (default message events).
-      eventSource.onmessage = (event) => {
-        try {
-          console.log("[useExecutionPolling] SSE message raw", {
-            lastEventId: event.lastEventId,
-            dataPreview: event.data?.slice?.(0, 200),
-          })
+        const data = await res.json()
 
-          const data = JSON.parse(event.data) as {
-            content?: string
-            toolCalls?: Array<{ tool: string; summary: string }>
-            contentBlocks?: Array<{ type: string; text?: string; toolCalls?: Array<{ tool: string; summary: string }> }>
+        if (!res.ok) {
+          if (res.status === 404 && data.error === "Execution not found") {
+            notFoundRetries++
+            if (notFoundRetries >= MAX_NOT_FOUND_RETRIES) {
+              if (pollingRef.current) {
+                clearInterval(pollingRef.current)
+                pollingRef.current = null
+              }
+              currentExecutionIdRef.current = null
+              currentMessageIdRef.current = null
+              onUpdateBranch({ status: BRANCH_STATUS.IDLE })
+            }
+            return
           }
+          console.error("Polling error:", data.error)
+          return
+        }
 
-          if (!data) return
+        notFoundRetries = 0
 
-          if (
-            data.content ||
-            (data.toolCalls && data.toolCalls.length > 0) ||
-            (data.contentBlocks && data.contentBlocks.length > 0)
-          ) {
-            const toolCallsWithIds = (data.toolCalls || []).map((tc, idx) => ({
+        // Update message content
+        if (
+          data.content ||
+          (data.toolCalls && data.toolCalls.length > 0) ||
+          (data.contentBlocks && data.contentBlocks.length > 0)
+        ) {
+          const toolCallsWithIds = (data.toolCalls || []).map(
+            (tc: { tool: string; summary: string }, idx: number) => ({
               id: `tc-${idx}`,
               tool: tc.tool,
               summary: tc.summary,
@@ -143,55 +138,66 @@ export function useExecutionPolling({
                 hour: "2-digit",
                 minute: "2-digit",
               }),
-            }))
+            }),
+          )
 
-            const contentBlocksWithIds = (data.contentBlocks || []).map(
-              (block, blockIdx) => {
-                if (block.type === "tool_calls" && block.toolCalls) {
-                  return {
-                    type: "tool_calls" as const,
-                    toolCalls: block.toolCalls.map((tc, tcIdx) => ({
-                      id: `tc-${blockIdx}-${tcIdx}`,
-                      tool: tc.tool,
-                      summary: tc.summary,
-                      timestamp: new Date().toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }),
-                    })),
-                  }
-                }
-                return block
+          const contentBlocksWithIds = (data.contentBlocks || []).map(
+            (
+              block: {
+                type: string
+                text?: string
+                toolCalls?: Array<{ tool: string; summary: string }>
               },
-            )
+              blockIdx: number,
+            ) => {
+              if (block.type === "tool_calls" && block.toolCalls) {
+                return {
+                  type: "tool_calls" as const,
+                  toolCalls: block.toolCalls.map((tc, tcIdx) => ({
+                    id: `tc-${blockIdx}-${tcIdx}`,
+                    tool: tc.tool,
+                    summary: tc.summary,
+                    timestamp: new Date().toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  })),
+                }
+              }
+              return block
+            },
+          )
 
-            onUpdateMessage(messageId, {
-              content: data.content || "",
-              toolCalls: toolCallsWithIds,
-              contentBlocks:
-                contentBlocksWithIds.length > 0 ? contentBlocksWithIds : undefined,
-            })
-          }
-        } catch (err) {
-          console.error("Failed to parse SSE content event:", err)
-        }
-      }
-
-      // Handle completion events.
-      eventSource.addEventListener("complete", async (event) => {
-        try {
-          console.log("[useExecutionPolling] SSE complete", {
-            data: (event as MessageEvent).data,
+          onUpdateMessage(messageId, {
+            content: data.content || "",
+            toolCalls: toolCallsWithIds,
+            contentBlocks:
+              contentBlocksWithIds.length > 0 ? contentBlocksWithIds : undefined,
           })
+        }
 
-          const data = JSON.parse((event as MessageEvent).data) as {
-            status?: string
+        // Check if completed or error
+        if (
+          data.status === EXECUTION_STATUS.COMPLETED ||
+          data.status === EXECUTION_STATUS.ERROR
+        ) {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
           }
-
           currentExecutionIdRef.current = null
           currentMessageIdRef.current = null
+          // Clear streaming signal so sync can resume normal behavior
           if (streamingMessageIdRef) {
             streamingMessageIdRef.current = null
+          }
+
+          if (data.status === EXECUTION_STATUS.ERROR && data.error) {
+            onUpdateMessage(messageId, {
+              content: data.content
+                ? `${data.content}\n\nError: ${data.error}`
+                : `Error: ${data.error}`,
+            })
           }
 
           onUpdateBranch({
@@ -283,56 +289,18 @@ export function useExecutionPolling({
           } catch {
             // Ignore audio errors
           }
-
-          eventSource.close()
-        } catch (err) {
-          console.error("Failed to handle SSE complete event:", err)
         }
-      })
-
-      // Handle error events from the server.
-      eventSource.addEventListener("error", (event) => {
-        try {
-          const msgEvent = event as MessageEvent
-          if (!msgEvent.data) {
-            return
-          }
-
-          const data = JSON.parse(String(msgEvent.data)) as {
-            message?: string
-          }
-
-          if (data?.message) {
-            onUpdateMessage(messageId, {
-              content: `Error: ${data.message}`,
-            })
-          }
-        } catch (err) {
-          console.error("Failed to handle SSE error event:", err)
-        } finally {
-          eventSource.close()
-        }
-      })
-
-      // Network errors / disconnects – allow EventSource to auto-reconnect.
-      eventSource.onerror = (event) => {
-        // Only log when the stream is actually closed; transient errors during
-        // reconnect are noisy and not actionable.
-        if (eventSource.readyState === EventSource.CLOSED) {
-          console.error("[useExecutionPolling] SSE closed", {
-            executionId,
-            messageId,
-            event,
-          })
-        }
+      } catch (err) {
+        console.error("Polling failed:", err)
       }
     }
 
-    // Slight delay to match previous polling behavior and avoid racing with
+    // Slight delay to match previous behavior and avoid racing with
     // immediate sync updates.
     pendingPollTimeoutRef.current = setTimeout(() => {
       pendingPollTimeoutRef.current = null
-      connect()
+      poll()
+      pollingRef.current = setInterval(poll, 500)
     }, 150)
   // Note: branch.sandboxId, branch.name, and branch.messages are accessed via refs to avoid stale closures
   // This is critical - including branch.messages in deps causes the callback to be recreated on every
@@ -343,17 +311,11 @@ export function useExecutionPolling({
 
   // Stop polling and update message
   const stopPolling = useCallback(() => {
-    // There is no explicit SSE handle stored here; stopping simply marks the
-    // branch idle and appends a "[Stopped by user]" note to the current
-    // assistant message, matching previous UX.
+    // Stopping marks the branch idle and appends a "[Stopped by user]" note
+    // to the current assistant message, matching previous UX.
     if (pendingPollTimeoutRef.current) {
       clearTimeout(pendingPollTimeoutRef.current)
       pendingPollTimeoutRef.current = null
-    }
-
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
     }
 
     if (currentMessageIdRef.current) {

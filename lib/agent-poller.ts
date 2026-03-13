@@ -27,10 +27,6 @@ export async function startAgentPoller(options: StartAgentPollerOptions): Promis
 
   const pollerPromise = (async () => {
     try {
-      console.log("[agent-poller] start", {
-        agentExecutionId,
-        backgroundSessionId,
-      })
       // Main polling loop: keep polling the Daytona background session until
       // the SDK reports completion or error.
       // Each poll writes a snapshot event into AgentEvent via agentExecutionId.
@@ -40,14 +36,6 @@ export async function startAgentPoller(options: StartAgentPollerOptions): Promis
         const result = await pollBackgroundAgent(sandbox, backgroundSessionId, {
           ...(pollOptions as PollBackgroundOptions),
           agentExecutionId,
-        })
-
-        console.log("[agent-poller] poll result", {
-          agentExecutionId,
-          status: result.status,
-          contentLength: result.content?.length ?? 0,
-          toolCalls: result.toolCalls.length,
-          contentBlocks: result.contentBlocks.length,
         })
 
         if (result.status === "completed" || result.status === "error") {

@@ -1,17 +1,5 @@
 import { prisma } from "@/lib/prisma"
 
-/**
- * Agent Events Storage Service
- *
- * Stores streaming events in the database for SSE delivery.
- * Supports multiple clients reading the same execution stream.
- *
- * Features:
- * - Buffered writes for efficiency (flush every 500ms or 10 events)
- * - Sequential event indexing for resumption
- * - Automatic cleanup after execution completes
- */
-
 // In-memory buffers for batching writes
 const eventBuffers = new Map<string, Array<{ type: string; data: object }>>()
 const flushIntervals = new Map<string, NodeJS.Timeout>()
@@ -23,8 +11,6 @@ function getAgentEventDelegate() {
       "Prisma client is missing AgentEvent model. Run: npx prisma generate"
     )
   }
-  // Loosely typed to avoid coupling to the generated Prisma client types.
-  // At runtime this is the AgentEvent delegate.
   return delegate as any
 }
 
@@ -37,8 +23,6 @@ export async function appendEvent(
   type: string,
   data: object
 ): Promise<number> {
-  console.log("[agent-events] appendEvent start", { executionId, type })
-
   // Get or create buffer
   let buffer = eventBuffers.get(executionId)
   if (!buffer) {
@@ -51,12 +35,6 @@ export async function appendEvent(
     }, 500)
     flushIntervals.set(executionId, interval)
   }
-
-  console.log("[agent-events] appendEvent push", {
-    executionId,
-    type,
-    bufferedBefore: buffer.length,
-  })
 
   buffer.push({ type, data })
 
@@ -78,11 +56,6 @@ export async function flushEvents(executionId: string): Promise<void> {
   const buffer = eventBuffers.get(executionId)
   if (!buffer || buffer.length === 0) return
 
-  console.log("[agent-events] flushEvents start", {
-    executionId,
-    bufferLength: buffer.length,
-  })
-
   // Batch insert
   const agentEvent = getAgentEventDelegate()
   try {
@@ -95,12 +68,6 @@ export async function flushEvents(executionId: string): Promise<void> {
       select: { eventIndex: true },
     })
     const baseIndex = (lastEvent?.eventIndex ?? 0) + 1
-
-    console.log("[agent-events] flushEvents computed baseIndex", {
-      executionId,
-      lastEventIndex: lastEvent?.eventIndex ?? 0,
-      baseIndex,
-    })
 
     await agentEvent.createMany({
       data: buffer.map((event, i) => ({
@@ -115,10 +82,6 @@ export async function flushEvents(executionId: string): Promise<void> {
     // Clear buffer
     buffer.length = 0
 
-    console.log("[agent-events] flushEvents done", {
-      executionId,
-      inserted: buffer.length,
-    })
   } catch (error) {
     console.error(`Failed to flush events for execution ${executionId}:`, error)
     throw error

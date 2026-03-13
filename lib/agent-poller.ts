@@ -1,4 +1,5 @@
 import type { Sandbox as DaytonaSandbox } from "@daytonaio/sdk"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { Agent } from "@/lib/types"
 import { pollBackgroundAgent, clearLastSnapshotForExecution, type PollBackgroundOptions } from "@/lib/agent-session"
@@ -75,7 +76,7 @@ export async function startAgentPoller(options: StartAgentPollerOptions): Promis
                 data: {
                   status: result.status,
                   completedAt: new Date(),
-                  latestSnapshot: null,
+                  latestSnapshot: Prisma.DbNull,
                 },
               }),
             )
@@ -123,7 +124,7 @@ export async function startAgentPoller(options: StartAgentPollerOptions): Promis
             }),
             prisma.agentExecution.update({
               where: { id: execution.id },
-              data: { status: "error", completedAt: new Date(), latestSnapshot: null },
+              data: { status: "error", completedAt: new Date(), latestSnapshot: Prisma.DbNull },
             }),
             prisma.sandbox.updateMany({
               where: { id: execution.sandboxId },

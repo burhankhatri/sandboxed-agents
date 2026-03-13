@@ -11,6 +11,7 @@ import {
   unauthorized,
   decryptUserCredentials,
 } from "@/lib/api-helpers"
+import { createSSEStream, sendProgress, sendError, sendDone } from "@/lib/streaming-helpers"
 
 export const maxDuration = 300 // 5 minute timeout for sandbox creation
 
@@ -21,8 +22,7 @@ export async function POST(req: Request) {
   const { userId } = authResult
 
   const body = await req.json()
-  const { repoId, repoOwner, repoName, baseBranch, newBranch, startCommit } =
-    body
+  const { repoId, repoOwner, repoName, baseBranch, newBranch, startCommit } = body
 
   if (!repoOwner || !repoName || !newBranch) {
     return badRequest("Missing required fields")
@@ -72,19 +72,14 @@ export async function POST(req: Request) {
     )
   }
 
-  const encoder = new TextEncoder()
+  // Track records for cleanup on error
+  let sandboxRecord: { id: string; sandboxId: string } | null = null
+  let branchRecord: { id: string } | null = null
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      function send(data: Record<string, unknown>) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-      }
-
-      let sandboxRecord: { id: string; sandboxId: string } | null = null
-      let branchRecord: { id: string } | null = null
-
+  return createSSEStream({
+    onStart: async (controller) => {
       try {
-        send({ type: "progress", message: "Creating sandbox..." })
+        sendProgress(controller, "Creating sandbox...")
 
         const daytona = new Daytona({ apiKey: daytonaApiKey })
         const sandboxName = generateSandboxName(userId)
@@ -107,15 +102,13 @@ export async function POST(req: Request) {
 
         // For Claude Max, write stored credentials so the Agent SDK picks them up
         if (anthropicAuthType === "claude-max" && anthropicAuthToken) {
-          const credentialsB64 = Buffer.from(anthropicAuthToken).toString(
-            "base64"
-          )
+          const credentialsB64 = Buffer.from(anthropicAuthToken).toString("base64")
           await sandbox.process.executeCommand(
             `mkdir -p /home/daytona/.claude && echo '${credentialsB64}' | base64 -d > /home/daytona/.claude/.credentials.json && chmod 600 /home/daytona/.claude/.credentials.json`
           )
         }
 
-        send({ type: "progress", message: "Cloning repository..." })
+        sendProgress(controller, "Cloning repository...")
 
         // Use Daytona SDK git interface
         const repoPath = `/home/daytona/${repoName}`
@@ -151,19 +144,13 @@ export async function POST(req: Request) {
         )
 
         // Create and checkout new branch via Daytona SDK
-        send({
-          type: "progress",
-          message: `Creating branch ${newBranch} from ${base}...`,
-        })
+        sendProgress(controller, `Creating branch ${newBranch} from ${base}...`)
         await sandbox.git.createBranch(repoPath, newBranch)
         await sandbox.git.checkoutBranch(repoPath, newBranch)
 
         // If starting from a specific commit, reset to it
         if (startCommit) {
-          send({
-            type: "progress",
-            message: `Resetting to commit ${startCommit.slice(0, 7)}...`,
-          })
+          sendProgress(controller, `Resetting to commit ${startCommit.slice(0, 7)}...`)
           await sandbox.process.executeCommand(
             `cd ${repoPath} && git reset --hard ${startCommit} 2>&1`
           )
@@ -182,7 +169,7 @@ export async function POST(req: Request) {
           headResult.exitCode
         )
 
-        send({ type: "progress", message: "Preparing agent environment..." })
+        sendProgress(controller, "Preparing agent environment...")
 
         // Get preview URL pattern for dev server URLs
         let previewUrlPattern: string | undefined
@@ -253,8 +240,7 @@ export async function POST(req: Request) {
           "[sandbox-create] Sending done event with startCommit:",
           headCommit
         )
-        send({
-          type: "done",
+        sendDone(controller, {
           sandboxId: sandbox.id,
           previewUrlPattern,
           branchId: branchRecord.id,
@@ -263,30 +249,16 @@ export async function POST(req: Request) {
         })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown error"
-        send({ type: "error", message })
+        sendError(controller, message)
 
         // Clean up database records if created
         if (sandboxRecord) {
-          await prisma.sandbox
-            .delete({ where: { id: sandboxRecord.id } })
-            .catch(() => {})
+          await prisma.sandbox.delete({ where: { id: sandboxRecord.id } }).catch(() => {})
         }
         if (branchRecord) {
-          await prisma.branch
-            .delete({ where: { id: branchRecord.id } })
-            .catch(() => {})
+          await prisma.branch.delete({ where: { id: branchRecord.id } }).catch(() => {})
         }
       }
-
-      controller.close()
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
     },
   })
 }

@@ -12,6 +12,11 @@ import {
   notFound,
   resetSandboxStatus,
 } from "@/lib/api-helpers"
+import {
+  createSSEStream,
+  sendError,
+  createContentAccumulator,
+} from "@/lib/streaming-helpers"
 
 export const maxDuration = 300 // 5 minute timeout for agent queries
 
@@ -45,32 +50,29 @@ export async function POST(req: Request) {
   const actualRepoName = repoName || sandboxRecord.branch?.repo?.name || "repo"
   const repoPath = `/home/daytona/${actualRepoName}`
 
-  const encoder = new TextEncoder()
-
   // Capture record IDs for use in helper functions
   const sandboxDbId = sandboxRecord.id
   const branchDbId = sandboxRecord.branch?.id
 
-  // Accumulate output so we can save it to DB even if client disconnects
-  let accumulatedContent = ""
-  let accumulatedToolCalls: { tool: string; summary: string }[] = []
-  let streamCancelled = false
+  // Create accumulator for tracking streamed content
+  const accumulator = createContentAccumulator()
   let hasSavedToDb = false
 
   // Helper to save accumulated content to DB (idempotent)
-  async function saveAccumulatedContent() {
+  async function saveAccumulatedContent(cancelled: boolean) {
     if (hasSavedToDb) return
     if (!messageId) return
-    if (!accumulatedContent && accumulatedToolCalls.length === 0) return
+    const content = accumulator.getContent()
+    const toolCalls = accumulator.getToolCalls()
+    if (!content && toolCalls.length === 0) return
 
     hasSavedToDb = true
     try {
       await prisma.message.update({
         where: { id: messageId },
         data: {
-          content: accumulatedContent,
-          toolCalls:
-            accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+          content,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
         },
       })
     } catch {
@@ -78,7 +80,7 @@ export async function POST(req: Request) {
     }
 
     // Also update branch/sandbox status to idle when cancelled
-    if (streamCancelled) {
+    if (cancelled) {
       try {
         await resetSandboxStatus(sandboxDbId, branchDbId)
       } catch {
@@ -87,19 +89,8 @@ export async function POST(req: Request) {
     }
   }
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      // Safe send that doesn't throw if stream is cancelled
-      function send(data: Record<string, unknown>) {
-        if (streamCancelled) return
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-        } catch {
-          // Controller is closed/cancelled, ignore the error
-          streamCancelled = true
-        }
-      }
-
+  return createSSEStream({
+    onStart: async (controller) => {
       try {
         // Ensure sandbox is ready (handles auth, CLI installation)
         const { sandbox, resumeSessionId, env } = await ensureSandboxReady(
@@ -137,18 +128,18 @@ export async function POST(req: Request) {
 
         // Stream events
         for await (const event of runAgentQuery(session, sandbox, prompt)) {
-          if (streamCancelled) break
+          if (controller.isCancelled()) break
 
           switch (event.type) {
             case "token":
-              accumulatedContent += event.content || ""
-              send({ type: "stdout", content: event.content })
+              accumulator.addContent(event.content || "")
+              controller.send({ type: "stdout", content: event.content })
               break
 
             case "tool":
               if (event.toolCall) {
-                accumulatedToolCalls.push(event.toolCall)
-                send({
+                accumulator.addToolCall(event.toolCall)
+                controller.send({
                   type: "stdout",
                   content: `TOOL_USE:${event.toolCall.summary}\n`,
                 })
@@ -157,7 +148,7 @@ export async function POST(req: Request) {
 
             case "session":
               if (event.sessionId) {
-                send({ type: "session-id", sessionId: event.sessionId })
+                controller.send({ type: "session-id", sessionId: event.sessionId })
                 prisma.sandbox
                   .update({
                     where: { id: sandboxRecord.id },
@@ -168,13 +159,13 @@ export async function POST(req: Request) {
               break
 
             case "error":
-              send({ type: "error", message: event.message })
+              controller.send({ type: "error", message: event.message })
               break
           }
         }
 
         // Save accumulated output to database
-        await saveAccumulatedContent()
+        await saveAccumulatedContent(false)
 
         // Update sandbox and branch status back to idle
         await prisma.sandbox.update({
@@ -188,39 +179,23 @@ export async function POST(req: Request) {
           })
         }
 
-        send({ type: "done" })
+        controller.send({ type: "done" })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : "Unknown error"
 
         // Save error message to database if we have a messageId
         // Only add error to content if it's not a stream cancellation
-        if (!streamCancelled) {
-          const errorMsg = `Error: ${message}`
-          accumulatedContent = accumulatedContent
-            ? `${accumulatedContent}\n\n${errorMsg}`
-            : errorMsg
+        if (!controller.isCancelled()) {
+          accumulator.addError(message)
         }
-        await saveAccumulatedContent()
+        await saveAccumulatedContent(controller.isCancelled())
 
-        send({ type: "error", message })
+        sendError(controller, message)
       }
-
-      controller.close()
     },
-    cancel() {
-      // Called when the client disconnects (e.g., page refresh)
-      streamCancelled = true
+    onCancel: () => {
       // Save whatever we have accumulated so far
-      // This runs async but we don't need to wait for it
-      saveAccumulatedContent()
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
+      saveAccumulatedContent(true)
     },
   })
 }

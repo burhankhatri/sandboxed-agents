@@ -68,6 +68,25 @@ function mergeSyncBranchIntoExisting(
 }
 
 /**
+ * Build branch list from sync data while preserving local-only branches
+ * (e.g. branch with status CREATING not yet in server response).
+ */
+function mergeBranchesWithLocalOnly(
+  existingBranches: Branch[],
+  syncBranches: SyncBranch[]
+): Branch[] {
+  const syncIds = new Set(syncBranches.map((b) => b.id))
+  const localOnly = existingBranches.filter((b) => !syncIds.has(b.id))
+  const fromSync = syncBranches.map((syncBranch) => {
+    const existing = existingBranches.find((b) => b.id === syncBranch.id)
+    return existing
+      ? mergeSyncBranchIntoExisting(existing, syncBranch)
+      : syncBranchToBranch(syncBranch)
+  })
+  return [...fromSync, ...localOnly]
+}
+
+/**
  * Provides the sync data handler for cross-device sync
  * Detects changes from other devices and updates local state
  */
@@ -106,15 +125,10 @@ export function useSyncData({ setRepos, activeBranchIdRef, streamingMessageIdRef
           // Try to preserve existing local data (messages, etc)
           const existing = prev.find((r) => r.id === syncRepo.id)
           if (existing) {
-            // Update branches while preserving messages
+            // Update branches from sync but keep local-only (e.g. CREATING) so they don't disappear mid-create
             return {
               ...existing,
-              branches: syncRepo.branches.map((syncBranch) => {
-                const existingBranch = existing.branches.find((b) => b.id === syncBranch.id)
-                return existingBranch
-                  ? mergeSyncBranchIntoExisting(existingBranch, syncBranch)
-                  : syncBranchToBranch(syncBranch)
-              }),
+              branches: mergeBranchesWithLocalOnly(existing.branches, syncRepo.branches),
             }
           }
           // New repo from sync
@@ -144,20 +158,13 @@ export function useSyncData({ setRepos, activeBranchIdRef, streamingMessageIdRef
           lastRepo.branches.some((b) => !currentBranchMap.has(b.id))
 
         if (branchesChanged) {
-          // Update this repo's branches
-          setRepos((prev) =>
-            setBranchesInRepo(
-              prev,
-              syncRepo.id,
-              syncRepo.branches.map((syncBranch) => {
-                const repo = prev.find((r) => r.id === syncRepo.id)
-                const existingBranch = repo?.branches.find((b) => b.id === syncBranch.id)
-                return existingBranch
-                  ? mergeSyncBranchIntoExisting(existingBranch, syncBranch)
-                  : syncBranchToBranch(syncBranch)
-              })
-            )
-          )
+          // Update this repo's branches but keep local-only (e.g. CREATING) so they don't disappear mid-create
+          setRepos((prev) => {
+            const repo = prev.find((r) => r.id === syncRepo.id)
+            if (!repo) return prev
+            const merged = mergeBranchesWithLocalOnly(repo.branches, syncRepo.branches)
+            return setBranchesInRepo(prev, syncRepo.id, merged)
+          })
         } else {
           // Check for individual branch updates (status, prUrl, messages)
           for (const syncBranch of syncRepo.branches) {

@@ -89,50 +89,6 @@ export async function flushEvents(executionId: string): Promise<void> {
 }
 
 /**
- * Get events after a given index.
- * Used for catchup and streaming.
- */
-export async function getEvents(
-  executionId: string,
-  afterIndex: number = 0
-): Promise<Array<{ eventIndex: number; type: string; data: unknown }>> {
-  // First flush any pending events to ensure consistency
-  await flushEvents(executionId)
-
-  const agentEvent = getAgentEventDelegate()
-  const events = await agentEvent.findMany({
-    where: {
-      executionId,
-      eventIndex: { gt: afterIndex },
-    },
-    orderBy: { eventIndex: "asc" },
-    select: {
-      eventIndex: true,
-      type: true,
-      data: true,
-    },
-  })
-
-  return events
-}
-
-/**
- * Get the latest event index for an execution.
- * Returns 0 if no events exist.
- */
-export async function getLatestEventIndex(executionId: string): Promise<number> {
-  // Fall back to DB
-  const agentEvent = getAgentEventDelegate()
-  const lastEvent = await agentEvent.findFirst({
-    where: { executionId },
-    orderBy: { eventIndex: "desc" },
-    select: { eventIndex: true },
-  })
-
-  return lastEvent?.eventIndex ?? 0
-}
-
-/**
  * Cleanup events for an execution.
  * Called after execution completes and clients have received the complete event.
  */

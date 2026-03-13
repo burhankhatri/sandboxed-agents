@@ -90,10 +90,10 @@ export async function POST(req: Request) {
         repoPath,
         previewUrlPattern:
           previewUrlPattern || sandboxRecord.previewUrlPattern || undefined,
-        // sessionId: resumeSessionId helps the provider reuse conversation state,
-        // while backgroundSessionId controls which background session object we reuse.
+        // sessionId: resumeSessionId helps the provider reuse conversation state.
+        // We intentionally do NOT reuse backgroundSessionId across executions,
+        // so each run gets a fresh background session bound to the resumed conversation.
         sessionId: resumeSessionId,
-        backgroundSessionId: sandboxRecord.sessionId || undefined,
         env,
       }
     )

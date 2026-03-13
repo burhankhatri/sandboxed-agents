@@ -31,9 +31,9 @@ export async function ensureSandboxReady(
   }
 
   // Read stored session ID for agent resumption
-  // Priority: database (persists across sandbox rebuilds) > file (may be lost on rebuild)
+  // Priority: file (latest conversation session, used by SDK) > database (fallback)
   const fileSessionId = await readPersistedSessionId(sandbox)
-  const resumeSessionId = databaseSessionId || fileSessionId
+  const resumeSessionId = fileSessionId || databaseSessionId
 
   console.log("[sandbox-resume] ensureSandboxReady", {
     sandboxId,

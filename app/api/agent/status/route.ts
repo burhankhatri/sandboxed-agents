@@ -158,7 +158,6 @@ export async function POST(req: Request) {
           where: { id: sandbox.id },
           data: {
             status: "idle",
-            ...(outputData.sessionId && { sessionId: outputData.sessionId }),
           },
         }),
         // Update branch status

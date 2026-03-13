@@ -39,6 +39,8 @@ export interface AgentSessionOptions {
 
 export interface BackgroundAgentOptions extends AgentSessionOptions {
   prompt: string
+  // Optional: existing background session ID to reuse
+  backgroundSessionId?: string
 }
 
 export interface AgentEvent {
@@ -288,6 +290,13 @@ export async function createAgentSession(
     env: options.env,
   }
 
+  console.log("[agent-session] createAgentSession", {
+    repoPath: options.repoPath,
+    previewUrlPattern: options.previewUrlPattern,
+    model: options.model,
+    sessionId: options.sessionId,
+  })
+
   const session = await sdkCreateSession("claude", sessionOptions)
 
   return { session, sandbox }
@@ -298,11 +307,15 @@ export async function* runAgentQuery(
   sandbox: DaytonaSandbox,
   prompt: string
 ): AsyncGenerator<AgentEvent> {
+  console.log("[agent-session] runAgentQuery start", { prompt })
   for await (const event of session.run(prompt)) {
     const transformed = transformEvent(event)
     if (transformed) {
       // Persist session ID when received
       if (transformed.type === "session" && transformed.sessionId) {
+        console.log("[agent-session] session event", {
+          sessionId: transformed.sessionId,
+        })
         await persistSessionId(sandbox, transformed.sessionId)
       }
       yield transformed
@@ -324,15 +337,33 @@ export async function startBackgroundAgent(
   )
 
   // Cast sandbox for SDK version compatibility
-  const bgSessionOptions: BackgroundSessionOptions = {
-    sandbox: sandbox as unknown as BackgroundSessionOptions['sandbox'],
-    systemPrompt,
+  const sandboxForSdk = sandbox as unknown as NonNullable<BackgroundSessionOptions['sandbox']>
+
+  // If we have an existing background session ID, reuse it via getBackgroundSession.
+  // Otherwise, create a new background session.
+  const bgSession = options.backgroundSessionId
+    ? await sdkGetBackgroundSession({
+        sandbox: sandboxForSdk,
+        backgroundSessionId: options.backgroundSessionId,
+        systemPrompt,
+        model: options.model,
+        env: options.env,
+      })
+    : await sdkCreateBackgroundSession("claude", {
+        sandbox: sandboxForSdk,
+        systemPrompt,
+        model: options.model,
+        sessionId: options.sessionId,
+        env: options.env,
+      })
+
+  console.log("[agent-session] startBackgroundAgent", {
+    repoPath: options.repoPath,
     model: options.model,
     sessionId: options.sessionId,
-    env: options.env,
-  }
-
-  const bgSession = await sdkCreateBackgroundSession("claude", bgSessionOptions)
+    backgroundSessionId: options.backgroundSessionId,
+    resolvedBackgroundSessionId: bgSession.id,
+  })
 
   const result = await bgSession.start(options.prompt)
 

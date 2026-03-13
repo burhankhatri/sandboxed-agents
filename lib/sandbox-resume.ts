@@ -35,6 +35,14 @@ export async function ensureSandboxReady(
   const fileSessionId = await readPersistedSessionId(sandbox)
   const resumeSessionId = databaseSessionId || fileSessionId
 
+  console.log("[sandbox-resume] ensureSandboxReady", {
+    sandboxId,
+    repoName,
+    databaseSessionId,
+    fileSessionId,
+    resumeSessionId,
+  })
+
   // For Claude Max, write credentials if needed
   if (anthropicAuthType === "claude-max" && anthropicAuthToken) {
     const credentialsB64 = Buffer.from(anthropicAuthToken).toString("base64")

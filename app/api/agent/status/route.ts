@@ -50,6 +50,10 @@ export async function POST(req: Request) {
   })
 
   if (!execution) {
+    console.warn("[agent/status] execution not found", {
+      executionId,
+      messageId,
+    })
     return notFound("Execution not found")
   }
 
@@ -100,10 +104,22 @@ export async function POST(req: Request) {
     const env: Record<string, string> = {}
     if (anthropicApiKey) env.ANTHROPIC_API_KEY = anthropicApiKey
 
-    // Poll via SDK helper with full options
+    // Poll via SDK helper with full options.
+    // For new executions, the long-lived background session ID is stored on the sandbox.
+    // For older executions, fall back to using execution.executionId directly.
+    const backgroundSessionId =
+      sandbox.sessionId || execution.executionId
+
+    console.log("[agent/status] polling", {
+      executionId: execution.executionId,
+      sandboxId: sandbox.id,
+      sandboxSessionId: sandbox.sessionId,
+      backgroundSessionId,
+    })
+
     const outputData = await pollBackgroundAgent(
       sandboxInstance,
-      execution.executionId,
+      backgroundSessionId,
       { repoPath, previewUrlPattern, env }
     )
 

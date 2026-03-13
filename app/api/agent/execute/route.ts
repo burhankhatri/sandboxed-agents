@@ -48,6 +48,14 @@ export async function POST(req: Request) {
   const repoPath = `/home/daytona/${actualRepoName}`
 
   try {
+    console.log("[agent/execute] start", {
+      sandboxId,
+      messageId,
+      prompt,
+      repoName: actualRepoName,
+      dbSessionId: sandboxRecord.sessionId,
+    })
+
     // 4. Ensure sandbox is ready
     const { sandbox, resumeSessionId, env } = await ensureSandboxReady(
       daytonaApiKey,
@@ -68,6 +76,12 @@ export async function POST(req: Request) {
       return notFound("Message not found - it may not have been saved yet")
     }
 
+    console.log("[agent/execute] after ensureSandboxReady", {
+      sandboxId,
+      resumeSessionId,
+      envKeys: Object.keys(env || {}),
+    })
+
     // 6. Start background agent via SDK
     const { executionId, backgroundSessionId } = await startBackgroundAgent(
       sandbox,
@@ -76,20 +90,43 @@ export async function POST(req: Request) {
         repoPath,
         previewUrlPattern:
           previewUrlPattern || sandboxRecord.previewUrlPattern || undefined,
+        // sessionId: resumeSessionId helps the provider reuse conversation state,
+        // while backgroundSessionId controls which background session object we reuse.
         sessionId: resumeSessionId,
+        backgroundSessionId: sandboxRecord.sessionId || undefined,
         env,
       }
     )
+
+    console.log("[agent/execute] started background agent", {
+      sandboxId,
+      executionId,
+      backgroundSessionId,
+    })
 
     // 7. Create AgentExecution record with SDK's execution ID
     await prisma.agentExecution.create({
       data: {
         messageId,
         sandboxId,
-        executionId: backgroundSessionId, // Use background session ID for polling
+        // Use SDK's executionId as the unique DB identifier
+        executionId,
         status: "running",
       },
     })
+
+    // Persist the background session ID on the sandbox so future runs can reuse it
+    if (sandboxRecord.sessionId !== backgroundSessionId) {
+      await prisma.sandbox.update({
+        where: { id: sandboxRecord.id },
+        data: { sessionId: backgroundSessionId },
+      })
+      console.log("[agent/execute] updated sandbox.sessionId", {
+        sandboxId,
+        oldSessionId: sandboxRecord.sessionId,
+        newSessionId: backgroundSessionId,
+      })
+    }
 
     // 8. Update sandbox and branch status
     await updateSandboxAndBranchStatus(
@@ -108,7 +145,8 @@ export async function POST(req: Request) {
 
     return Response.json({
       success: true,
-      executionId: backgroundSessionId,
+      // Return the unique AgentExecution.executionId so polling can look it up.
+      executionId,
       messageId,
     })
   } catch (error: unknown) {

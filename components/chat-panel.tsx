@@ -175,6 +175,9 @@ export function ChatPanel({
     currentMessageIdRef.current = messageId
 
     try {
+      const effectiveAgent = (branch.agent || "claude-code") as Agent
+      const effectiveModel = branch.model ?? getDefaultModelForAgent(effectiveAgent, credentials)
+
       const response = await fetch("/api/agent/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,8 +187,8 @@ export function ChatPanel({
           previewUrlPattern: branch.previewUrlPattern,
           repoName,
           messageId,
-          agent: branch.agent || "claude-code",
-          model: branch.model ?? undefined,
+          agent: effectiveAgent,
+          model: effectiveModel,
         }),
       })
 

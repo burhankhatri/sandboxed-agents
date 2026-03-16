@@ -39,7 +39,7 @@ export function useRepoData({ isAuthenticated }: UseRepoDataOptions) {
       })
       .then(async (data) => {
         if (data.repos) {
-          const transformedRepos = data.repos.map(transformRepo)
+          const transformedRepos: TransformedRepo[] = data.repos.map(transformRepo)
           // Apply saved repo order from localStorage
           const orderedRepos = applyRepoOrder(transformedRepos)
           setRepos(orderedRepos)

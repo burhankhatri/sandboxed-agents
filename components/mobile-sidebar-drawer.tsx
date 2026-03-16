@@ -8,6 +8,7 @@ import { randomBranchName, validateBranchName } from "@/lib/branch-utils"
 import { BRANCH_STATUS } from "@/lib/constants"
 import { StatusDot } from "@/components/ui/status-dot"
 import { Plus, X, LogOut, Settings, Box, ChevronDown, Check, Loader2, GitBranch } from "lucide-react"
+import { AgentIcon } from "@/components/icons/agent-icons"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
@@ -468,7 +469,8 @@ export function MobileSidebarDrawer({
                           )}>
                             {branch.name}
                           </span>
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <AgentIcon agent={branch.agent || "claude-code"} className="h-2 w-2" />
                             {branch.status === BRANCH_STATUS.CREATING ? "Setting up..." : agentLabels[branch.agent || "claude-code"]}
                           </span>
                         </div>

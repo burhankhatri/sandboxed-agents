@@ -9,6 +9,7 @@ import { BRANCH_STATUS } from "@/lib/constants"
 import { StatusDot } from "@/components/ui/status-dot"
 import { DeleteBranchDialog, useDeleteBranchDialog } from "@/components/delete-branch-dialog"
 import { GitBranch, Plus, Search, ChevronDown, Loader2, X } from "lucide-react"
+import { AgentIcon } from "@/components/icons/agent-icons"
 import { Input } from "@/components/ui/input"
 import { useState, useRef, useEffect, useCallback } from "react"
 
@@ -334,7 +335,8 @@ export function BranchList({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <AgentIcon agent={branch.agent || "claude-code"} className="h-2.5 w-2.5" />
                           {branch.status === BRANCH_STATUS.CREATING ? "Setting up..." : agentLabels[branch.agent || "claude-code"]}
                         </span>
                       </div>

@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils"
 import type { Agent, Branch, Message } from "@/lib/types"
 import { agentLabels } from "@/lib/types"
 import { BRANCH_STATUS } from "@/lib/constants"
-import { Loader2, Terminal, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle } from "lucide-react"
+import { AgentIcon } from "@/components/icons/agent-icons"
 import { forwardRef } from "react"
 import { MessageBubble } from "./message-bubble"
 
@@ -75,7 +76,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         <MessageListContainer ref={ref} onScroll={onScroll} isMobile={isMobile}>
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
-              <Terminal className="h-5 w-5" />
+              <AgentIcon agent={normalizedAgent as Agent} className="h-5 w-5" />
             </div>
             <p className="text-sm">Start a conversation with {currentAgentLabel}</p>
             <p className="text-xs text-muted-foreground/60">The agent has access to Read, Edit, Write, Bash and more</p>
@@ -92,7 +93,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
             <MessageBubble
               key={msg.id}
               message={msg}
-              agentLabel={currentAgentLabel}
+              agent={normalizedAgent as Agent}
               onCommitClick={onCommitClick}
               onBranchFromCommit={onBranchFromCommit}
             />

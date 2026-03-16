@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils"
 import type { Agent, Branch, UserCredentialFlags, ModelOption } from "@/lib/types"
 import { agentLabels, getModelLabel, defaultAgentModel, getAvailableModels, hasClaudeCodeCredentials, hasCodexCredentials, hasCredentialsForModel, agentModels } from "@/lib/types"
 import { BRANCH_STATUS } from "@/lib/constants"
-import { Send, Terminal, ChevronDown, Sparkles, Check } from "lucide-react"
+import { Send, ChevronDown, Sparkles, Check } from "lucide-react"
+import { AgentIcon } from "@/components/icons/agent-icons"
 import { forwardRef, useEffect, useCallback, useState, useMemo } from "react"
 import {
   DropdownMenu,
@@ -178,7 +179,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           {/* Agent Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className="group flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground data-[state=open]:text-foreground cursor-pointer">
-              <Terminal className="h-2.5 w-2.5 shrink-0" />
+              <AgentIcon agent={currentAgent} className="h-2.5 w-2.5 shrink-0" />
               <span>{agentLabels[currentAgent]}</span>
               <ChevronDown className="h-2.5 w-2.5 shrink-0 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180" />
             </DropdownMenuTrigger>
@@ -190,6 +191,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="flex items-center justify-between py-1.5 text-[11px] cursor-pointer"
                 >
                   <span className="flex items-center gap-1.5">
+                    <AgentIcon agent={agent} className="h-3 w-3 shrink-0" />
                     {agentLabels[agent]}
                   </span>
                   {agent === currentAgent && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}

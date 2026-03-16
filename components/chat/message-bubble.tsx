@@ -1,7 +1,8 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { Message, ToolCall } from "@/lib/types"
+import type { Agent, Message, ToolCall } from "@/lib/types"
+import { agentLabels } from "@/lib/types"
 import {
   FileText,
   Pencil,
@@ -13,6 +14,7 @@ import {
   GitCommitHorizontal,
   GitBranch,
 } from "lucide-react"
+import { AgentIcon } from "@/components/icons/agent-icons"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -85,12 +87,15 @@ function TextBlockContent({ text }: { text: string }) {
 
 interface MessageBubbleProps {
   message: Message
-  agentLabel?: string
+  agent?: Agent
+  agentLabel?: string // Deprecated: use agent prop instead
   onCommitClick?: (hash: string, msg: string) => void
   onBranchFromCommit?: (hash: string) => void
 }
 
-export function MessageBubble({ message, agentLabel = "Claude Code", onCommitClick, onBranchFromCommit }: MessageBubbleProps) {
+export function MessageBubble({ message, agent = "claude-code", agentLabel, onCommitClick, onBranchFromCommit }: MessageBubbleProps) {
+  // Use agent prop primarily, fall back to agentLabel for backwards compatibility
+  const displayLabel = agentLabel || agentLabels[agent] || "Claude Code"
   const isUser = message.role === "user"
 
   // Commit row rendering
@@ -128,14 +133,14 @@ export function MessageBubble({ message, agentLabel = "Claude Code", onCommitCli
       <div className="flex items-center gap-2 mb-1">
         {!isUser && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/20">
-            <Terminal className="h-3 w-3 text-primary" />
+            <AgentIcon agent={agent} className="h-3 w-3 text-primary" />
           </div>
         )}
         <span className={cn(
           "text-[11px] font-medium",
           isUser ? "text-muted-foreground" : "text-foreground"
         )}>
-          {isUser ? "You" : agentLabel}
+          {isUser ? "You" : displayLabel}
         </span>
         <span className="text-[10px] text-muted-foreground/40">{message.timestamp}</span>
       </div>

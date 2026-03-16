@@ -104,6 +104,16 @@ export function BranchList({
     }
   }, [newBranchOpen])
 
+  // Reset create branch UI when repo changes
+  useEffect(() => {
+    setNewBranchOpen(false)
+    setNewBranchName("")
+    setCreateError(null)
+    setStartCommit(null)
+    setNewBranchBase(repo.defaultBranch || "main")
+    setGithubBranches([])
+  }, [repo.id, repo.defaultBranch])
+
   const fetchGithubBranches = useCallback(async () => {
     setGithubBranchesLoading(true)
     try {

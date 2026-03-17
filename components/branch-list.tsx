@@ -8,7 +8,7 @@ import { randomBranchName, validateBranchName } from "@/lib/branch-utils"
 import { BRANCH_STATUS } from "@/lib/constants"
 import { StatusDot } from "@/components/ui/status-dot"
 import { DeleteBranchDialog, useDeleteBranchDialog } from "@/components/delete-branch-dialog"
-import { GitBranch, Plus, Search, ChevronDown, Loader2, X } from "lucide-react"
+import { GitBranch, Plus, Search, ChevronDown, Loader2, X, Settings } from "lucide-react"
 import { AgentIcon } from "@/components/icons/agent-icons"
 import { Input } from "@/components/ui/input"
 import { useState, useRef, useEffect, useCallback } from "react"
@@ -28,6 +28,7 @@ interface BranchListProps {
   onClearPendingCommit?: () => void
   isMobile?: boolean
   credentials?: UserCredentialFlags | null
+  onOpenRepoSettings?: () => void
 }
 
 export function BranchList({
@@ -45,6 +46,7 @@ export function BranchList({
   onClearPendingCommit,
   isMobile = false,
   credentials,
+  onOpenRepoSettings,
 }: BranchListProps) {
   const [search, setSearch] = useState("")
   const [branchFromOpen, setBranchFromOpen] = useState(false)
@@ -281,19 +283,33 @@ export function BranchList({
       "relative flex h-full flex-col bg-card",
       isMobile ? "flex-1" : "shrink-0 border-r border-border"
     )} style={widthStyle}>
-      <a
-        href={`https://github.com/${repo.owner}/${repo.name}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 border-b border-border px-4 py-3"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-muted-foreground">
-          <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z" />
-        </svg>
-        <span className="text-sm font-semibold text-foreground truncate">
-          {repo.owner}/{repo.name}
-        </span>
-      </a>
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <a
+          href={`https://github.com/${repo.owner}/${repo.name}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 min-w-0 flex-1"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-muted-foreground">
+            <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z" />
+          </svg>
+          <span className="text-sm font-semibold text-foreground truncate">
+            {repo.owner}/{repo.name}
+          </span>
+        </a>
+        {onOpenRepoSettings && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenRepoSettings()
+            }}
+            className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            title="Repository settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="px-3 py-2">
         <div className="relative">

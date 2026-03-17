@@ -390,7 +390,10 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
                   )}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Paste the output of:{" "}
+                  First sign in with <code className="text-[10px]">claude auth login</code>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Then, paste the output of:{" "}
                   <code
                     className="text-[10px] cursor-pointer"
                     onClick={() => {
@@ -406,7 +409,7 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
                   </code>
                 </p>
                 <p className="text-[10px] text-muted-foreground/70">
-                  Claude Code agent only. Not compatible with OpenCode agent.
+                  Claude Code agent only. Not compatible with other agents.
                 </p>
               </div>
 

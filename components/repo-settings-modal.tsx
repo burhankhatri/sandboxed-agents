@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { X, Plus, Trash2, Loader2, Variable } from "lucide-react"
+import { X, Plus, Trash2, Loader2, Variable, AlertTriangle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 
@@ -182,6 +182,14 @@ export function RepoSettingsModal({
             Environment variables defined here will be injected into every sandbox created for this repository.
             Values are encrypted and stored securely.
           </p>
+
+          {/* Warning about agent visibility */}
+          <div className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">
+              These variables will be visible to the AI agent running in the sandbox. Do not store secrets you don&apos;t want the agent to access.
+            </p>
+          </div>
 
           {/* Environment Variables List */}
           <div className="flex flex-col gap-3">

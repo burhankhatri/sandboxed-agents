@@ -17,6 +17,11 @@ import {
 import { AgentIcon } from "@/components/icons/agent-icons"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // ============================================================================
 // Tool Call Components
@@ -54,9 +59,22 @@ function ToolCallTimeline({ toolCalls }: { toolCalls: ToolCall[] }) {
             <div className="relative z-10 flex h-[12px] w-[12px] shrink-0 items-center justify-center text-muted-foreground mt-0.5">
               <ToolCallIcon tool={tc.tool} />
             </div>
-            <span className="text-xs text-muted-foreground break-words min-w-0">
-              {tc.summary}
-            </span>
+            {tc.fullSummary ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs text-muted-foreground break-words min-w-0 cursor-help">
+                    {tc.summary}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-md break-all font-mono text-[10px]">
+                  {tc.fullSummary}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="text-xs text-muted-foreground break-words min-w-0">
+                {tc.summary}
+              </span>
+            )}
           </div>
         ))}
       </div>

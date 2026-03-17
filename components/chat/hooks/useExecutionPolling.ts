@@ -167,10 +167,11 @@ export function useExecutionPolling({
           (data.contentBlocks && data.contentBlocks.length > 0)
         ) {
           const toolCallsWithIds = (data.toolCalls || []).map(
-            (tc: { tool: string; summary: string }, idx: number) => ({
+            (tc: { tool: string; summary: string; fullSummary?: string }, idx: number) => ({
               id: `tc-${idx}`,
               tool: tc.tool,
               summary: tc.summary,
+              fullSummary: tc.fullSummary,
               timestamp: new Date().toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -183,7 +184,7 @@ export function useExecutionPolling({
               block: {
                 type: string
                 text?: string
-                toolCalls?: Array<{ tool: string; summary: string }>
+                toolCalls?: Array<{ tool: string; summary: string; fullSummary?: string }>
               },
               blockIdx: number,
             ) => {
@@ -194,6 +195,7 @@ export function useExecutionPolling({
                     id: `tc-${blockIdx}-${tcIdx}`,
                     tool: tc.tool,
                     summary: tc.summary,
+                    fullSummary: tc.fullSummary,
                     timestamp: new Date().toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -240,10 +242,11 @@ export function useExecutionPolling({
           const targetBranchId = pollingBranchIdRef.current
           if (targetBranchId) {
             const finalToolCalls = (data.toolCalls || []).map(
-              (tc: { tool: string; summary: string }, idx: number) => ({
+              (tc: { tool: string; summary: string; fullSummary?: string }, idx: number) => ({
                 id: `tc-${idx}`,
                 tool: tc.tool,
                 summary: tc.summary,
+                fullSummary: tc.fullSummary,
                 timestamp: new Date().toLocaleTimeString([], {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -255,7 +258,7 @@ export function useExecutionPolling({
                 block: {
                   type: string
                   text?: string
-                  toolCalls?: Array<{ tool: string; summary: string }>
+                  toolCalls?: Array<{ tool: string; summary: string; fullSummary?: string }>
                 },
                 blockIdx: number,
               ) => {
@@ -266,6 +269,7 @@ export function useExecutionPolling({
                       id: `tc-${blockIdx}-${tcIdx}`,
                       tool: tc.tool,
                       summary: tc.summary,
+                      fullSummary: tc.fullSummary,
                       timestamp: new Date().toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",

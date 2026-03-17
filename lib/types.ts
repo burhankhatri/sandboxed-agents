@@ -234,6 +234,7 @@ export interface ToolCall {
   id: string
   tool: string // "Read", "Edit", "Write", "Glob", "Grep", "Bash", etc.
   summary: string
+  fullSummary?: string // Full summary when truncated (for hover tooltip)
   timestamp: string
 }
 

@@ -50,7 +50,7 @@ export interface BackgroundAgentOptions extends AgentSessionOptions {
 export interface AgentEvent {
   type: "token" | "tool" | "session" | "error" | "done"
   content?: string
-  toolCall?: { tool: string; summary: string }
+  toolCall?: { tool: string; summary: string; fullSummary?: string }
   sessionId?: string
   message?: string
 }
@@ -61,7 +61,7 @@ export type ContentBlock = {
   text: string
 } | {
   type: "tool_calls"
-  toolCalls: Array<{ tool: string; summary: string }>
+  toolCalls: Array<{ tool: string; summary: string; fullSummary?: string }>
 }
 
 export interface AgentCrashedPayload {
@@ -72,7 +72,7 @@ export interface AgentCrashedPayload {
 export interface BackgroundPollResult {
   status: "running" | "completed" | "error"
   content: string
-  toolCalls: Array<{ tool: string; summary: string }>
+  toolCalls: Array<{ tool: string; summary: string; fullSummary?: string }>
   contentBlocks: ContentBlock[]
   error?: string
   agentCrashed?: AgentCrashedPayload
@@ -131,28 +131,41 @@ Replace {port} with the actual port number. For example, if you start a server o
 // Tool Detail Extraction (for summary strings)
 // =============================================================================
 
-function getToolDetail(toolName: string, input: unknown): string {
-  if (!input || typeof input !== "object") return ""
+interface ToolDetailResult {
+  summary: string
+  fullDetail?: string // Only set if different from summary (i.e., was truncated)
+}
+
+function getToolDetail(toolName: string, input: unknown): ToolDetailResult {
+  if (!input || typeof input !== "object") return { summary: "" }
   const inp = input as Record<string, unknown>
 
   const mappedName = mapToolName(toolName)
 
   if (mappedName === "Bash" && inp.command) {
     const cmd = String(inp.command)
-    return cmd.length > 80 ? cmd.slice(0, 80) + "..." : cmd
+    if (cmd.length > 80) {
+      return { summary: cmd.slice(0, 80) + "...", fullDetail: cmd }
+    }
+    return { summary: cmd }
   }
   if (["Read", "Edit", "Write"].includes(mappedName) && inp.file_path) {
     const path = String(inp.file_path)
-    return path.split("/").pop() || path
+    const filename = path.split("/").pop() || path
+    // Only set fullDetail if filename is different from full path
+    if (filename !== path) {
+      return { summary: filename, fullDetail: path }
+    }
+    return { summary: filename }
   }
   if (mappedName === "Glob" && inp.pattern) {
-    return String(inp.pattern)
+    return { summary: String(inp.pattern) }
   }
   if (mappedName === "Grep" && inp.pattern) {
-    return String(inp.pattern)
+    return { summary: String(inp.pattern) }
   }
 
-  return ""
+  return { summary: "" }
 }
 
 // =============================================================================
@@ -167,11 +180,12 @@ export function transformEvent(event: Event): AgentEvent | null {
     case "tool_start": {
       const toolEvent = event as ToolStartEvent
       const tool = mapToolName(toolEvent.name)
-      const detail = getToolDetail(toolEvent.name, toolEvent.input)
+      const { summary: detail, fullDetail } = getToolDetail(toolEvent.name, toolEvent.input)
       const summary = detail ? `${tool}: ${detail}` : tool
+      const fullSummary = fullDetail ? `${tool}: ${fullDetail}` : undefined
       return {
         type: "tool",
-        toolCall: { tool, summary },
+        toolCall: { tool, summary, fullSummary },
       }
     }
 
@@ -202,11 +216,11 @@ export function transformEvent(event: Event): AgentEvent | null {
 
 export function buildContentBlocks(
   events: Event[]
-): { content: string; toolCalls: Array<{ tool: string; summary: string }>; contentBlocks: ContentBlock[] } {
+): { content: string; toolCalls: Array<{ tool: string; summary: string; fullSummary?: string }>; contentBlocks: ContentBlock[] } {
   const blocks: ContentBlock[] = []
   let pendingText = ""
-  let pendingToolCalls: Array<{ tool: string; summary: string }> = []
-  const allToolCalls: Array<{ tool: string; summary: string }> = []
+  let pendingToolCalls: Array<{ tool: string; summary: string; fullSummary?: string }> = []
+  const allToolCalls: Array<{ tool: string; summary: string; fullSummary?: string }> = []
   let allContent = ""
 
   for (const event of events) {
@@ -227,9 +241,10 @@ export function buildContentBlocks(
         pendingText = ""
       }
       const tool = mapToolName(toolEvent.name)
-      const detail = getToolDetail(toolEvent.name, toolEvent.input)
+      const { summary: detail, fullDetail } = getToolDetail(toolEvent.name, toolEvent.input)
       const summary = detail ? `${tool}: ${detail}` : tool
-      const toolCall = { tool, summary }
+      const fullSummary = fullDetail ? `${tool}: ${fullDetail}` : undefined
+      const toolCall = { tool, summary, fullSummary }
       pendingToolCalls.push(toolCall)
       allToolCalls.push(toolCall)
     }

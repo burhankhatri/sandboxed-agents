@@ -431,13 +431,7 @@ A Vercel cron job runs every minute to check for completed executions where loop
 - Handles cases where the browser is closed mid-loop
 - Waits 15 seconds after completion before triggering (to let frontend handle first)
 - Protected with `CRON_SECRET` environment variable
-
-**Setup:**
-1. Generate a secret: `openssl rand -base64 32`
-2. Add `CRON_SECRET` to your Vercel environment variables
-3. The cron job is automatically configured via `vercel.json` (runs every minute)
-
-> **Note**: Vercel Cron is available on Pro and Enterprise plans. On the Hobby plan, you can use an external cron service (e.g., cron-job.org) to call `GET /api/cron/loop-check` with the `Authorization: Bearer <CRON_SECRET>` header.
+- Automatically configured via `vercel.json`
 
 ### Continuation Message
 

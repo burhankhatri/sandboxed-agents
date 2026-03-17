@@ -100,24 +100,17 @@ export function ChatHeader({
           </button>
           {/* Magic wand button for AI-suggested branch name */}
           {renaming.canSuggestName && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={renaming.suggestBranchName}
-                  disabled={renaming.suggesting}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/0 group-hover/branch-section:text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {renaming.suggesting ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-2.5 w-2.5" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                Suggest branch name
-              </TooltipContent>
-            </Tooltip>
+            <button
+              onClick={renaming.suggestBranchName}
+              disabled={renaming.suggesting}
+              className="cursor-pointer disabled:cursor-not-allowed"
+            >
+              {renaming.suggesting ? (
+                <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin text-muted-foreground" />
+              ) : (
+                <Sparkles className="h-2.5 w-2.5 shrink-0 text-muted-foreground/0 group-hover/branch-section:text-muted-foreground transition-colors" />
+              )}
+            </button>
           )}
         </div>
       )}

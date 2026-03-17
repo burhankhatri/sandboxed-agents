@@ -126,12 +126,14 @@ function sanitizeBranchName(name: string): string {
     .replace(/[`'"]/g, "")
     // Replace spaces and underscores with hyphens
     .replace(/[\s_]+/g, "-")
-    // Remove invalid git branch characters
+    // Remove invalid git branch characters (slashes are allowed for prefixes like feat/)
     .replace(/[~^:?*\[\]\\@{}<>|!#$%&()+=,;]/g, "")
     // Remove consecutive hyphens
     .replace(/-+/g, "-")
-    // Remove leading/trailing hyphens or dots
-    .replace(/^[-.]|[-.]$/g, "")
+    // Remove consecutive slashes
+    .replace(/\/+/g, "/")
+    // Remove leading/trailing hyphens, dots, or slashes
+    .replace(/^[-.\/]|[-.\/]$/g, "")
     // Limit length
     .slice(0, 50)
 }

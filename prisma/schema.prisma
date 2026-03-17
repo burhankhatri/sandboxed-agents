@@ -100,6 +100,9 @@ model Repo {
   avatar        String?
   defaultBranch String
 
+  // Encrypted environment variables for sandboxes (JSON: { KEY: "encrypted_value", ... })
+  envVars Json?
+
   branches Branch[]
 
   createdAt DateTime @default(now())

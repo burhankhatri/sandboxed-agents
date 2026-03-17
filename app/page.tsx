@@ -8,6 +8,7 @@ import { BranchList } from "@/components/branch-list"
 import { ChatPanel, EmptyChatPanel } from "@/components/chat-panel"
 import { BackgroundExecutionPoller } from "@/components/chat/background-execution-poller"
 import { GitHistoryPanel } from "@/components/git-history-panel"
+import { GitHistorySheet } from "@/components/git-history-sheet"
 import { SettingsModal } from "@/components/settings-modal"
 import { AddRepoModal } from "@/components/add-repo-modal"
 import { MobileHeader } from "@/components/mobile-header"
@@ -334,6 +335,22 @@ export default function Home() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Mobile Git History Sheet */}
+        {isMobile && activeBranch?.sandboxId && activeRepo && (
+          <GitHistorySheet
+            open={gitHistoryOpen}
+            onOpenChange={setGitHistoryOpen}
+            sandboxId={activeBranch.sandboxId}
+            repoName={activeRepo.name}
+            baseBranch={activeBranch.baseBranch}
+            refreshTrigger={gitHistoryRefreshTrigger}
+            onScrollToCommit={(shortHash) => {
+              document.getElementById(`commit-${shortHash}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }}
+            onBranchFromCommit={(commitHash) => setPendingStartCommit(commitHash)}
+          />
         )}
 
         {/* Desktop: Main content area */}

@@ -1,46 +1,108 @@
 # Sandboxed Agents
 
-A multi-tenant web application that lets users run Claude Code agents in isolated Daytona sandboxes. Each user gets their own sandboxes linked to GitHub repositories, with real-time streaming of agent output.
+A sophisticated multi-tenant web application that enables users to run AI coding agents (Claude Code, OpenCode, Codex) in isolated Daytona sandboxes. Features a Slack-like interface for managing AI-powered coding agents across multiple GitHub repositories with real-time streaming output, background execution, and persistent chat history.
 
 ## Features
 
-- **GitHub OAuth Login** - Sign in with GitHub, OAuth tokens used for repo access
-- **Isolated Sandboxes** - Each branch gets its own Daytona sandbox with Claude Code
-- **Real-time Streaming** - Live agent output via Server-Sent Events
-- **Multi-tenant** - User data isolated, shared Daytona infrastructure
-- **Quota Enforcement** - 5 concurrent sandboxes per user
-- **Encrypted Credentials** - User's Anthropic API keys stored encrypted in database
+### Core Capabilities
+- **Multi-Agent Support** - Run Claude Code, OpenCode, or Codex agents with configurable models
+- **GitHub OAuth Login** - Sign in with GitHub, OAuth tokens used for seamless repo access
+- **Isolated Sandboxes** - Each branch gets its own Daytona sandbox environment
+- **Real-time Streaming** - Live agent output via Server-Sent Events (SSE)
+- **Background Execution** - Agent tasks continue even when browser is closed
+- **Persistent Chat History** - Full conversation history with tool calls and content blocks
+
+### User Experience
+- **Slack-like Interface** - Repository sidebar with branch-based conversations
+- **Multi-tenant Architecture** - User data fully isolated, shared infrastructure
+- **Quota Enforcement** - Configurable concurrent sandbox limits (default: 5 per user)
+- **Encrypted Credentials** - API keys stored AES-encrypted in database
+- **Drag-and-Drop Reordering** - Customize repository order in sidebar
+- **Dark Mode Support** - Theme switching with next-themes
+- **Mobile Responsive** - Full mobile UI with drawer navigation
+
+### Developer Features
+- **Pull Request Integration** - Create PRs directly from branches
+- **Git Diff Viewer** - Compare branches and view changes
+- **Git History** - Browse commit history per branch
+- **Environment Variables** - Per-repository encrypted env vars for sandboxes
+- **Auto-Stop** - Configurable sandbox auto-stop intervals (5-20 minutes)
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────┐     ┌───────────────────┐     ┌──────────────┐
-│   Browser       │────▶│   Next.js API     │────▶│   Neon DB    │
-│   (React)       │     │   (Vercel)        │     │  (Postgres)  │
-└─────────────────┘     └─────────┬─────────┘     └──────────────┘
-                                  │
-                                  ▼
-                        ┌───────────────────┐     ┌──────────────┐
-                        │  Daytona Sandbox  │────▶│  Claude API  │
-                        │  (Python Agent)   │     │  (Anthropic) │
-                        └───────────────────┘     └──────────────┘
+┌─────────────────────┐     ┌─────────────────────┐     ┌──────────────────┐
+│   Browser (React)   │────▶│   Next.js 16 API    │────▶│   Neon Postgres  │
+│   - Shadcn/ui       │◀────│   (Vercel/Node)     │◀────│   (Serverless)   │
+│   - SSE Streaming   │     │   - 34 API routes   │     │   - Prisma ORM   │
+└─────────────────────┘     └──────────┬──────────┘     └──────────────────┘
+                                       │
+                    ┌──────────────────┼──────────────────┐
+                    │                  │                  │
+                    ▼                  ▼                  ▼
+          ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+          │  Daytona Cloud  │ │   GitHub API    │ │   LLM APIs      │
+          │  (Sandboxes)    │ │   (OAuth)       │ │   - Anthropic   │
+          │  - SDK control  │ │   - Repos/PRs   │ │   - OpenAI      │
+          └────────┬────────┘ └─────────────────┘ └─────────────────┘
+                   │
+                   ▼
+          ┌─────────────────┐
+          │  Coding Agents  │
+          │  - Claude Code  │
+          │  - OpenCode     │
+          │  - Codex        │
+          └─────────────────┘
 ```
 
 ### Data Flow
 
-1. User authenticates via GitHub OAuth (NextAuth.js)
-2. User adds repositories and creates branches
-3. Each branch spins up a Daytona sandbox with Claude Code agent
-4. User sends prompts → API streams agent output back in real-time
-5. Agent can read/write files, run commands, make commits
+1. **Authentication** - User authenticates via GitHub OAuth (NextAuth.js)
+2. **Repository Setup** - User adds repositories from GitHub, creates branches
+3. **Sandbox Creation** - Each branch spins up a Daytona sandbox with selected agent
+4. **Chat Interaction** - User sends prompts → API streams agent output in real-time
+5. **Agent Execution** - Agent reads/writes files, runs commands, makes commits
+6. **Background Processing** - Long-running tasks continue server-side if browser closes
+7. **Pull Requests** - User creates PRs from completed branch work
 
 ### Credential Management
 
 | Credential | Storage | Access |
 |------------|---------|--------|
-| GitHub OAuth Token | NextAuth Account table | Server-side only |
-| Daytona API Key | Environment variable | Shared, server-side only |
-| Anthropic API Key | Encrypted in database | User provides, decrypted at runtime |
+| GitHub OAuth Token | NextAuth Account table | Server-side only, auto-refreshed |
+| Daytona API Key | Environment variable | Shared infrastructure, server-side |
+| Anthropic API Key | AES encrypted in database | User provides, decrypted at runtime |
+| OpenAI API Key | AES encrypted in database | User provides, decrypted at runtime |
+| OpenCode API Key | AES encrypted in database | User provides, decrypted at runtime |
+| Repository Env Vars | AES encrypted in database | Per-repo, injected into sandbox |
+
+---
+
+## Tech Stack
+
+### Frontend
+- **Framework**: Next.js 16.1.6 (App Router, React 19)
+- **UI Library**: Shadcn/ui (50+ Radix UI components)
+- **Styling**: Tailwind CSS 4.2
+- **Forms**: React Hook Form + Zod validation
+- **Icons**: Lucide React (564 icons)
+- **Charts**: Recharts
+- **Notifications**: Sonner toast notifications
+- **Markdown**: react-markdown for agent output
+
+### Backend
+- **Server**: Next.js API Routes (serverless)
+- **ORM**: Prisma 7.4.2 with Neon adapter
+- **Database**: PostgreSQL (Neon serverless)
+- **Authentication**: NextAuth.js 4.24 (GitHub OAuth)
+- **Encryption**: crypto-js (AES encryption)
+
+### External Services
+- **Sandboxes**: Daytona SDK (@daytonaio/sdk)
+- **Agent Runner**: @jamesmurdza/coding-agents-sdk
+- **LLM Providers**: Anthropic SDK, OpenAI SDK
 
 ---
 
@@ -83,10 +145,10 @@ A multi-tenant web application that lets users run Claude Code agents in isolate
 ### 3. Generate Secrets
 
 ```bash
-# NextAuth secret
+# NextAuth secret (32-byte base64)
 openssl rand -base64 32
 
-# Encryption key for storing Anthropic credentials
+# Encryption key for API credentials (32-byte hex)
 openssl rand -hex 32
 ```
 
@@ -102,7 +164,7 @@ Add these to Vercel (Settings → Environment Variables):
 | `NEXTAUTH_SECRET` | Random secret for NextAuth | (output of `openssl rand -base64 32`) |
 | `GITHUB_CLIENT_ID` | From GitHub OAuth App | `Ov23li...` |
 | `GITHUB_CLIENT_SECRET` | From GitHub OAuth App | `abc123...` |
-| `ENCRYPTION_KEY` | For encrypting Anthropic keys | (output of `openssl rand -hex 32`) |
+| `ENCRYPTION_KEY` | For encrypting API keys | (output of `openssl rand -hex 32`) |
 | `DAYTONA_API_KEY` | Your shared Daytona API key | `dtn_...` |
 | `DAYTONA_API_URL` | Daytona API endpoint | `https://api.daytona.io` |
 
@@ -122,7 +184,7 @@ npx prisma migrate deploy
 npm run build
 ```
 
-Or just push to Vercel - the build script handles migrations automatically.
+Or push to Vercel - the build script handles migrations automatically.
 
 ### 6. Setup Checklist
 
@@ -137,11 +199,14 @@ Or just push to Vercel - the build script handles migrations automatically.
 [ ] NEXTAUTH_SECRET set
 [ ] ENCRYPTION_KEY set
 [ ] DAYTONA_API_KEY set
+[ ] DAYTONA_API_URL set
 ```
 
 ---
 
 ## Development
+
+### Quick Start
 
 ```bash
 # Install dependencies
@@ -156,6 +221,18 @@ npx prisma migrate dev
 # Start dev server
 npm run dev
 ```
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server with Webpack |
+| `npm run dev:local` | Dev with local SDK + debug logs |
+| `npm run build` | Prisma generate + Next.js build |
+| `npm run start` | Production server |
+| `npm run lint` | ESLint check |
+| `npm run install:local` | Setup local SDK symlink |
+| `npm run build-sdk` | Build local SDK |
 
 ### Local Environment
 
@@ -175,15 +252,15 @@ DAYTONA_API_URL="https://api.daytona.io"
 
 > **Note**: For local GitHub OAuth, create a separate OAuth App with callback URL `http://localhost:3000/api/auth/callback/github`
 
-### Local coding-agents-sdk
+### Local coding-agents-sdk Development
 
 To develop against the local `@jamesmurdza/coding-agents-sdk` repo instead of the npm package:
 
-1. **Switch to local SDK** (run after clone or when you want to use local again):
+1. **Switch to local SDK**:
    ```bash
    npm run install:local
    ```
-   This installs deps, symlinks `node_modules/@jamesmurdza/coding-agents-sdk` to `/Users/jamie/codeagentsdk`, and builds the SDK.
+   This installs deps, symlinks `node_modules/@jamesmurdza/coding-agents-sdk` to your local SDK path, and builds the SDK.
 
 2. **Run dev with local SDK and debug logs**:
    ```bash
@@ -191,104 +268,156 @@ To develop against the local `@jamesmurdza/coding-agents-sdk` repo instead of th
    ```
    Runs `install:local` then `npm run dev` with `CODING_AGENTS_DEBUG=1`.
 
-3. **After changing the SDK**, rebuild so the app picks it up:
+3. **After changing the SDK**, rebuild:
    ```bash
    npm run build-sdk
    ```
 
-4. **Switch back to the published SDK**:
+4. **Switch back to published SDK**:
    ```bash
    npm install
    ```
 
-The local SDK path is set in `scripts/link-local-sdk.js`; change it if your repo lives elsewhere.
+The local SDK path is configured in `scripts/link-local-sdk.js`.
 
 ---
 
 ## Database Schema
 
+### Entity Relationship
+
 ```
 User
 ├── id, name, email, image (NextAuth)
 ├── githubId, githubLogin
+├── isAdmin, maxSandboxes (quota override)
+├── repoOrder (JSON array for sidebar ordering)
 ├── credentials (1:1) → UserCredentials
 ├── repos (1:n) → Repo
 └── sandboxes (1:n) → Sandbox
 
 UserCredentials
-├── anthropicApiKey (encrypted)
+├── anthropicApiKey (AES encrypted)
 ├── anthropicAuthType ("api-key" | "claude-max")
-└── anthropicAuthToken (encrypted, for Claude Max)
+├── anthropicAuthToken (encrypted, for Claude Max)
+├── openaiApiKey (AES encrypted)
+├── opencodeApiKey (AES encrypted)
+├── daytonaApiKey (optional custom key)
+└── sandboxAutoStopInterval (5-20 minutes)
 
 Repo
-├── owner, name, defaultBranch
+├── owner, name, avatar, defaultBranch
+├── envVars (encrypted JSON)
 └── branches (1:n) → Branch
 
 Branch
-├── name, startCommit, status
+├── name, baseBranch, startCommit
+├── status ("idle" | "running" | "creating" | "stopped" | "error")
+├── agent ("claude-code" | "opencode" | "codex")
+├── model (selected model name)
+├── draftPrompt (unsent message)
+├── prUrl (pull request link)
 ├── sandbox (1:1) → Sandbox
 └── messages (1:n) → Message
 
 Sandbox
 ├── sandboxId (format: agenthub-{userId}-{uuid})
-├── sandboxName, status, contextId
-└── lastActiveAt
+├── contextId, sessionId (for SDK resumption)
+├── sessionAgent (track agent type)
+├── previewUrlPattern (web previews)
+├── status, lastActiveAt
+└── execution → AgentExecution
 
 Message
 ├── role ("user" | "assistant")
-├── content, toolCalls (JSON)
-└── createdAt
+├── content (full output text)
+├── toolCalls (JSON array)
+├── contentBlocks (interleaved text/tool order)
+├── commitHash, commitMessage
+├── timestamp
+└── execution (1:1) → AgentExecution
+
+AgentExecution
+├── executionId (SDK execution ID)
+├── status ("running" | "completed" | "error")
+├── latestSnapshot (streaming content)
+├── accumulatedEvents (full event list)
+└── lastSnapshotPolledAt (500ms throttle)
 ```
-
----
-
-## Quotas
-
-- **Concurrent sandboxes**: 5 per user
-- When limit reached: New sandbox creation blocked until user stops an existing one
-- Sandbox naming: `agenthub-{userId-prefix}-{uuid}`
 
 ---
 
 ## API Routes
 
-### Auth
-- `GET/POST /api/auth/[...nextauth]` - NextAuth handlers
+### Authentication
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET/POST | `/api/auth/[...nextauth]` | NextAuth.js handlers |
 
-### User
-- `GET /api/user/me` - Get current user with repos and quota
-- `POST /api/user/credentials` - Save Anthropic credentials (encrypted)
-- `DELETE /api/user/credentials` - Clear credentials
-- `GET /api/user/quota` - Get quota usage
+### User Management
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/user/me` | Get current user with repos and quota |
+| POST | `/api/user/credentials` | Save encrypted API credentials |
+| DELETE | `/api/user/credentials` | Clear credentials |
+| GET | `/api/user/quota` | Get sandbox quota usage |
+| POST | `/api/user/repo-order` | Save repository ordering |
 
-### Repos & Branches
-- `GET /api/repos` - List user's repos
-- `POST /api/repos` - Add repo
-- `DELETE /api/repos/[id]` - Remove repo
-- `GET /api/repos/[id]/branches` - List branches
-- `POST /api/repos/[id]/branches` - Create branch
-- `GET /api/branches/[id]/messages` - Get chat history
-- `POST /api/branches/[id]/messages` - Save message
+### Repository & Branch Management
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/repos` | List user's repos |
+| POST | `/api/repos` | Add repository |
+| GET | `/api/repo/[repoId]` | Get repo details |
+| PATCH | `/api/repo/[repoId]` | Update repo |
+| DELETE | `/api/repo/[repoId]` | Delete repo |
+| GET/POST | `/api/repo/[repoId]/env-vars` | Manage encrypted env vars |
+| POST | `/api/branches` | Create branch |
+| GET | `/api/branches/messages` | Get chat history |
+| POST | `/api/branches/suggest-name` | Auto-generate branch name |
 
-### Sandbox
-- `POST /api/sandbox/create` - Create sandbox (checks quota)
-- `POST /api/sandbox/delete` - Delete sandbox
-- `POST /api/sandbox/status` - Get/update sandbox status
-- `POST /api/agent/query` - Stream agent query (SSE)
+### Agent Execution
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/api/agent/query` | Stream agent output (SSE) |
+| POST | `/api/agent/execute` | Start background execution |
+| GET | `/api/agent/execution/active` | Get active background executions |
+| GET | `/api/agent/status` | Poll execution status |
 
-### GitHub (uses OAuth token)
-- `GET /api/github/repos` - List user's repos
-- `GET /api/github/branches` - List branches
-- `POST /api/github/pr` - Create pull request
+### Sandbox Management
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/api/sandbox/create` | Create sandbox (quota check) |
+| POST | `/api/sandbox/delete` | Delete sandbox |
+| GET | `/api/sandbox/status` | Get sandbox health |
+| POST | `/api/sandbox/autostop` | Auto-stop idle sandboxes |
+
+### GitHub Integration
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/github/repos` | List user's GitHub repos |
+| GET | `/api/github/branches` | List repo branches |
+| GET | `/api/github/user` | Authenticated user info |
+| POST | `/api/github/pr` | Create pull request |
+| POST | `/api/github/create` | Create new repository |
+| POST | `/api/github/fork` | Fork repository |
+| GET | `/api/github/compare` | Compare branches |
+| GET | `/api/github/check-merged` | Check merge status |
+
+### Admin (requires isAdmin flag)
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/admin/users` | List all users with stats |
+| PATCH | `/api/admin/users/[userId]` | Modify user sandbox limits |
 
 ---
 
-## Streaming
+## Streaming Protocol
 
 Agent output streams via Server-Sent Events:
 
 ```typescript
-// Frontend
+// Frontend consumption
 const response = await fetch("/api/agent/query", {
   method: "POST",
   credentials: "include",  // Session cookie
@@ -303,23 +432,162 @@ while (true) {
 }
 ```
 
-Event types:
-- `{ type: "stdout", content: "..." }` - Agent output
-- `{ type: "stderr", content: "..." }` - Agent errors
-- `{ type: "context-updated", contextId: "..." }` - Session resumed
-- `{ type: "session-id", sessionId: "..." }` - For resumption
-- `{ type: "error", message: "..." }` - Fatal error
-- `{ type: "done" }` - Query complete
+### Event Types
+
+| Type | Description | Payload |
+|------|-------------|---------|
+| `token` | Text content token | `{ content: "..." }` |
+| `tool` | Tool call event | `{ toolCall: { tool: "Read", summary: "..." } }` |
+| `stdout` | Standard output | `{ content: "..." }` |
+| `stderr` | Error output | `{ content: "..." }` |
+| `session-id` | Session for resumption | `{ sessionId: "..." }` |
+| `context-updated` | Context ID updated | `{ contextId: "..." }` |
+| `error` | Fatal error | `{ message: "..." }` |
+| `done` | Query complete | `{}` |
+
+---
+
+## Background Execution
+
+For long-running tasks, the app supports background execution that continues even when the browser is closed:
+
+1. **Initiation**: Frontend calls `/api/agent/execute` instead of `/api/agent/query`
+2. **Server-side Processing**: Agent runs in Daytona sandbox, events saved to `AgentExecution`
+3. **Polling**: `BackgroundExecutionPoller` component polls `/api/agent/execution/active`
+4. **Snapshot Updates**: Server saves snapshots every 500ms (throttled)
+5. **Resumption**: On page reload, active executions are detected and resumed in UI
+
+---
+
+## Agent & Model Support
+
+### Supported Agents
+
+| Agent | Provider | Models |
+|-------|----------|--------|
+| Claude Code | Anthropic | claude-sonnet-4-20250514, claude-3-7-sonnet-latest, claude-opus-4-20250514 |
+| OpenCode | OpenCode | Various |
+| Codex | OpenAI | codex-mini, o3, o4-mini, gpt-4.1-mini |
+
+### Model Configuration
+
+Models are configured per-branch in the chat header. The system automatically:
+- Injects the correct API key based on model provider
+- Persists model selection across sessions
+- Validates model/agent compatibility
+
+---
+
+## Quotas & Limits
+
+| Resource | Default Limit | Configurable |
+|----------|---------------|--------------|
+| Concurrent sandboxes | 5 per user | Per-user override via admin |
+| Auto-stop interval | 10 minutes | User settings (5-20 min) |
+| Sandbox statuses counted | CREATING, RUNNING, STOPPED | - |
+| Message history | Unlimited | - |
+
+When quota is reached, new sandbox creation is blocked until user stops an existing one.
 
 ---
 
 ## Security
 
-- **No credentials in localStorage** - All secrets server-side
-- **Encrypted at rest** - Anthropic keys AES encrypted in database
+### Data Protection
+- **No credentials in localStorage** - All secrets stored server-side
+- **Encrypted at rest** - API keys AES-256 encrypted in database
 - **Session-based auth** - JWT via NextAuth, HTTP-only cookies
+- **Parameterized queries** - Prisma prevents SQL injection
+
+### Access Control
 - **Sandbox isolation** - Users can only access their own sandboxes
+- **Multi-tenant data** - All queries filtered by userId
+- **Admin separation** - Admin routes require isAdmin flag
+
+### External Services
 - **Shared Daytona key** - Never exposed to frontend
+- **OAuth token handling** - GitHub tokens stored in NextAuth Account table
+- **Rate limiting** - Handled by external services (GitHub, Anthropic, etc.)
+
+---
+
+## Project Structure
+
+```
+sandboxed-agents/
+├── app/                          # Next.js App Router
+│   ├── api/                      # 34 API route handlers
+│   │   ├── auth/                 # NextAuth handlers
+│   │   ├── user/                 # User management
+│   │   ├── repos/                # Repository CRUD
+│   │   ├── branches/             # Branch management
+│   │   ├── agent/                # Agent execution
+│   │   ├── sandbox/              # Sandbox lifecycle
+│   │   ├── github/               # GitHub API proxy
+│   │   └── admin/                # Admin endpoints
+│   ├── page.tsx                  # Main dashboard
+│   ├── layout.tsx                # Root layout
+│   ├── login/                    # Login page
+│   └── admin/                    # Admin panel
+├── components/                   # React UI components
+│   ├── chat/                     # Chat interface
+│   │   ├── chat-panel.tsx        # Main chat container
+│   │   ├── chat-header.tsx       # Branch selector, controls
+│   │   ├── chat-input.tsx        # Message input
+│   │   ├── message-list.tsx      # Message history
+│   │   └── chat-dialogs.tsx      # Modals and sheets
+│   ├── ui/                       # Shadcn/ui components (~50)
+│   ├── repo-sidebar.tsx          # Repository navigation
+│   ├── branch-list.tsx           # Branch management
+│   ├── add-repo-modal.tsx        # Add repository dialog
+│   ├── settings-modal.tsx        # User settings
+│   └── [other components]
+├── hooks/                        # Custom React hooks
+│   ├── use-repo-data.ts          # Fetch repos/branches/messages
+│   ├── use-sync-data.ts          # Real-time sync
+│   ├── use-branch-operations.ts  # Branch actions
+│   ├── use-repo-operations.ts    # Repo actions
+│   ├── use-branch-selection.ts   # Selection state
+│   └── [other hooks]
+├── lib/                          # Shared utilities
+│   ├── agent-session.ts          # SDK wrapper
+│   ├── agent-events.ts           # Event handling
+│   ├── sandbox-resume.ts         # Sandbox resumption
+│   ├── api-helpers.ts            # API utilities
+│   ├── github-client.ts          # GitHub API wrapper
+│   ├── encryption.ts             # AES encryption
+│   ├── quota.ts                  # Quota enforcement
+│   ├── types.ts                  # Type definitions
+│   ├── constants.ts              # App constants
+│   ├── state-utils.ts            # Immutable state helpers
+│   ├── prisma.ts                 # Prisma client
+│   └── [other utilities]
+├── prisma/
+│   ├── schema.prisma             # Database schema
+│   └── migrations/               # Migration history
+├── public/                       # Static assets
+├── scripts/                      # Build scripts
+│   └── link-local-sdk.js         # Local SDK setup
+├── types/                        # TypeScript definitions
+├── package.json                  # Dependencies
+├── tsconfig.json                 # TypeScript config
+├── next.config.mjs               # Next.js config
+├── prisma.config.ts              # Prisma config
+├── components.json               # Shadcn/ui config
+└── postcss.config.mjs            # PostCSS/Tailwind config
+```
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes
+4. Run linting: `npm run lint`
+5. Commit your changes: `git commit -m "Add my feature"`
+6. Push to the branch: `git push origin feature/my-feature`
+7. Open a Pull Request
 
 ---
 

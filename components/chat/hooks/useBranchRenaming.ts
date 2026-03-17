@@ -102,27 +102,31 @@ export function useBranchRenaming({
         throw new Error(data.error || "Failed to generate suggestion")
       }
 
-      setRenameValue(data.suggestedName)
-      // Focus the input with cursor at the end after a brief delay for state to update
-      setTimeout(() => {
+      const suggestedName = data.suggestedName
+      setRenameValue(suggestedName)
+      // Focus the input with cursor at the end after React re-renders
+      requestAnimationFrame(() => {
         const input = renameInputRef.current
         if (input) {
           input.focus()
-          input.setSelectionRange(input.value.length, input.value.length)
+          const len = suggestedName.length
+          input.setSelectionRange(len, len)
         }
-      }, 0)
+      })
     } catch (err: unknown) {
       // On error, fall back to current branch name
-      setRenameValue(branch.name)
+      const fallbackName = branch.name
+      setRenameValue(fallbackName)
       addSystemMessage(`Suggestion failed: ${err instanceof Error ? err.message : "Unknown error"}`)
       // Still focus the input on error
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         const input = renameInputRef.current
         if (input) {
           input.focus()
-          input.setSelectionRange(input.value.length, input.value.length)
+          const len = fallbackName.length
+          input.setSelectionRange(len, len)
         }
-      }, 0)
+      })
     } finally {
       setSuggesting(false)
     }

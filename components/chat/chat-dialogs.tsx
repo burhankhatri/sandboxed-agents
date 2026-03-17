@@ -73,7 +73,7 @@ export function ChatDialogs({ branch, repoOwner, repoName, gitActions }: ChatDia
               {/* Arrow with "into" and swap button */}
               <div className="flex items-center justify-between w-full py-1">
                 <div className="flex-1" />
-                <span className="text-xs text-muted-foreground">↓ into</span>
+                <span className="text-xs text-muted-foreground">into</span>
                 <div className="flex-1 flex justify-end">
                   <button
                     type="button"

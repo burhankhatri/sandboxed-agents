@@ -1,7 +1,7 @@
 "use client"
 
 import type { Branch } from "@/lib/types"
-import { Loader2, Copy, Check, RefreshCw } from "lucide-react"
+import { Loader2, Copy, Check, ArrowUpDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -81,7 +81,7 @@ export function ChatDialogs({ branch, repoOwner, repoName, gitActions }: ChatDia
                     className="cursor-pointer rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     title="Swap merge direction"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <ArrowUpDown className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>

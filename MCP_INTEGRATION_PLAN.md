@@ -16,8 +16,11 @@ Integrate remote MCP (Model Context Protocol) servers into the sandboxed-agents 
 
 ### 2. Execution Model: **Inside Sandbox**
 - MCP tools execute from within the Daytona sandbox
-- Agents (Claude Code, OpenCode) have native MCP support
-- Write MCP config file to sandbox before agent starts
+- **All three agents have native MCP support:**
+  - **Claude Code**: Config at `~/.claude/mcp_servers.json`
+  - **OpenCode**: Config at `~/.config/opencode/opencode.jsonc` (supports OAuth automatically)
+  - **Codex**: Config at `~/.codex/config.toml` (supports STDIO + HTTP servers)
+- Write agent-specific MCP config file to sandbox before agent starts
 
 ### 3. Authentication: **OAuth 2.0 Only** (initially)
 - Most commercial MCP servers use OAuth (Notion, Figma, GitHub, etc.)
@@ -196,19 +199,28 @@ const mcpServers = await prisma.repoMcpServer.findMany({
   where: { repoId, status: "connected" }
 })
 
-// 2. Decrypt tokens and build config
-const mcpConfig = buildMcpConfigJson(mcpServers)
+// 2. Skip if no servers configured
+if (mcpServers.length === 0) return
 
-// 3. Write to sandbox (if any servers configured)
-if (Object.keys(mcpConfig.mcpServers).length > 0) {
-  await sandbox.process.executeCommand(
-    `mkdir -p ~/.claude && echo '${base64Encode(JSON.stringify(mcpConfig))}' | base64 -d > ~/.claude/mcp_servers.json`
-  )
-}
+// 3. Decrypt tokens and build agent-specific config
+const { configPath, configContent } = buildMcpConfig(mcpServers, agent)
+
+// 4. Write to sandbox
+await sandbox.process.executeCommand(
+  `mkdir -p $(dirname ${configPath}) && echo '${base64Encode(configContent)}' | base64 -d > ${configPath}`
+)
 ```
 
-### MCP Config Format
+**Config paths by agent:**
+| Agent | Config Path |
+|-------|-------------|
+| Claude Code | `~/.claude/mcp_servers.json` |
+| OpenCode | `~/.config/opencode/opencode.jsonc` |
+| Codex | `~/.codex/config.toml` |
 
+### MCP Config Formats (Per Agent)
+
+**Claude Code** (`~/.claude/mcp_servers.json`):
 ```json
 {
   "mcpServers": {
@@ -216,19 +228,42 @@ if (Object.keys(mcpConfig.mcpServers).length > 0) {
       "type": "http",
       "url": "https://mcp.notion.com/mcp",
       "headers": {
-        "Authorization": "Bearer <decrypted_token>"
-      }
-    },
-    "figma": {
-      "type": "http",
-      "url": "https://mcp.figma.com/mcp",
-      "headers": {
-        "Authorization": "Bearer <decrypted_token>"
+        "Authorization": "Bearer <token>"
       }
     }
   }
 }
 ```
+
+**OpenCode** (`~/.config/opencode/opencode.jsonc`):
+```jsonc
+{
+  "mcp": {
+    "servers": {
+      "notion": {
+        "type": "remote",
+        "url": "https://mcp.notion.com/mcp",
+        "headers": {
+          "Authorization": "Bearer <token>"
+        }
+      }
+    }
+  }
+}
+```
+
+**Codex** (`~/.codex/config.toml`):
+```toml
+[[mcp.servers]]
+name = "notion"
+type = "http"
+url = "https://mcp.notion.com/mcp"
+
+[mcp.servers.headers]
+Authorization = "Bearer <token>"
+```
+
+The `buildMcpConfigJson()` function will generate the appropriate format based on the agent being used.
 
 ---
 

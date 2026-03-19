@@ -6,22 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
-// NextAuth required tables
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -35,29 +33,23 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?          @unique
   emailVerified DateTime?
   image         String?
-  githubId      String?   @unique
+  githubId      String?          @unique
   githubLogin   String?
-
-  // User preferences
-  repoOrder Json? // Array of repo IDs in display order
-
-  // Admin settings
-  isAdmin      Boolean @default(false)
-  maxSandboxes Int? // Per-user sandbox limit (null = use global default)
-
-  accounts    Account[]
-  sessions    Session[]
-  credentials UserCredentials?
-  repos       Repo[]
-  sandboxes   Sandbox[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  repoOrder     Json?
+  isAdmin       Boolean          @default(false)
+  maxSandboxes  Int?
+  accounts      Account[]
+  repos         Repo[]
+  sandboxes     Sandbox[]
+  sessions      Session[]
+  credentials   UserCredentials?
 }
 
 model VerificationToken {
@@ -68,196 +60,131 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Application-specific tables
 model UserCredentials {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Encrypted Anthropic credentials
-  anthropicApiKey    String? @db.Text
-  anthropicAuthType  String  @default("api-key") // "api-key" | "claude-max"
-  anthropicAuthToken String? @db.Text
-
-  // Encrypted OpenAI credentials (for Codex and OpenCode agents)
-  openaiApiKey String? @db.Text
-
-  // Encrypted OpenCode credentials (for OpenCode agent paid models)
-  opencodeApiKey String? @db.Text
-
-  // Custom Daytona API key (replaces platform key, clears all sandboxes when changed)
-  daytonaApiKey String? @db.Text
-
-  // Sandbox settings
-  sandboxAutoStopInterval Int @default(5) // 5-20 minutes
-
-  // Loop mode settings
-  defaultLoopMaxIterations Int @default(10) // Default max loop iterations for new branches (1-25)
-
-  updatedAt DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  anthropicApiKey          String?
+  anthropicAuthType        String   @default("api-key")
+  anthropicAuthToken       String?
+  updatedAt                DateTime @updatedAt
+  sandboxAutoStopInterval  Int      @default(5)
+  openaiApiKey             String?
+  daytonaApiKey            String?
+  opencodeApiKey           String?
+  defaultLoopMaxIterations Int      @default(10)
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Repo {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id            String          @id @default(cuid())
+  userId        String
   name          String
   owner         String
   avatar        String?
   defaultBranch String
-
-  // Encrypted environment variables for sandboxes (JSON: { KEY: "encrypted_value", ... })
-  envVars Json?
-
-  branches   Branch[]
-  mcpServers RepoMcpServer[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  envVars       Json?
+  branches      Branch[]
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mcpServers    RepoMcpServer[]
 
   @@unique([userId, owner, name])
 }
 
-// MCP Server configuration per repository
 model RepoMcpServer {
-  id     String @id @default(cuid())
-  repoId String
-  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
-
-  // Server identification (from registry)
-  slug    String  // "notion", "figma", "sentry", etc.
-  name    String  // Display name
-  url     String  // MCP server URL (https://mcp.notion.com/mcp)
-  iconUrl String? // Icon URL from registry
-
-  // OAuth credentials
-  clientId     String?   // Client ID from dynamic registration
-  accessToken  String?   @db.Text
-  refreshToken String?   @db.Text
+  id           String    @id @default(cuid())
+  repoId       String
+  slug         String
+  name         String
+  url          String
+  iconUrl      String?
+  accessToken  String?
+  refreshToken String?
   tokenExpiry  DateTime?
+  status       String    @default("pending")
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  clientId     String?
+  repo         Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
 
-  // Status
-  status    String  @default("pending") // "pending" | "connected" | "expired" | "error"
-  lastError String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([repoId, slug]) // One per service per repo
+  @@unique([repoId, slug])
   @@index([repoId])
 }
 
 model Branch {
-  id     String @id @default(cuid())
-  repoId String
-  repo   Repo   @relation(fields: [repoId], references: [id], onDelete: Cascade)
-
-  name        String
-  baseBranch  String?
-  startCommit String?
-  status      String  @default("idle") // "idle" | "running" | "creating" | "stopped" | "error"
-  prUrl       String?
-  draftPrompt String? @db.Text // Persisted draft input for chat continuity
-
-  // Agent configuration
-  agent String @default("claude-code") // "claude-code" | "opencode" | "codex"
-  model String? // Model selection for the agent (e.g., "sonnet", "gpt-4o")
-
-  // Loop mode configuration
-  loopEnabled       Boolean @default(false) // Is loop mode active for this branch?
-  loopCount         Int     @default(0)     // Current number of loop iterations
-  loopMaxIterations Int     @default(10)    // Max iterations before stopping
-
-  sandbox  Sandbox?
-  messages Message[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String    @id @default(cuid())
+  repoId            String
+  name              String
+  baseBranch        String?
+  startCommit       String?
+  status            String    @default("idle")
+  prUrl             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  draftPrompt       String?
+  agent             String    @default("claude-code")
+  model             String?
+  loopCount         Int       @default(0)
+  loopEnabled       Boolean   @default(false)
+  loopMaxIterations Int       @default(10)
+  repo              Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  messages          Message[]
+  sandbox           Sandbox?
 
   @@unique([repoId, name])
 }
 
 model Sandbox {
-  id String @id @default(cuid())
-
-  // Daytona sandbox info
-  sandboxId   String @unique // Format: agenthub-{userId}-{uuid}
-  sandboxName String
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  branchId String @unique
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
+  id                String   @id @default(cuid())
+  sandboxId         String   @unique
+  sandboxName       String
+  userId            String
+  branchId          String   @unique
   contextId         String?
   sessionId         String?
-  sessionAgent      String? // agent that created this session; when different, we start a new session
   previewUrlPattern String?
-  status            String  @default("creating") // "creating" | "running" | "stopped" | "error"
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  lastActiveAt DateTime @default(now())
+  status            String   @default("creating")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastActiveAt      DateTime @default(now())
+  sessionAgent      String?
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
-  id       String @id @default(cuid())
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-  role          String // "user" | "assistant"
-  content       String  @db.Text
+  id            String          @id @default(cuid())
+  branchId      String
+  role          String
+  content       String
   toolCalls     Json?
-  contentBlocks Json?   // Interleaved text and tool calls in order
   timestamp     String?
   commitHash    String?
   commitMessage String?
-
-  createdAt DateTime @default(now())
-
-  execution AgentExecution?
+  createdAt     DateTime        @default(now())
+  contentBlocks Json?
+  agentId       String?
+  execution     AgentExecution?
+  branch        Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@index([branchId, createdAt])
 }
 
-// Tracks background agent executions that survive browser close.
-// latestSnapshot holds the current streaming content until completion (then final content is on Message).
 model AgentExecution {
-  id        String @id @default(cuid())
-  messageId String @unique
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  sandboxId   String
-  executionId String? @unique // SDK execution id (set after agent launches)
-
-  status      String   @default("running") // "running" | "completed" | "error"
-  startedAt   DateTime @default(now())
-  completedAt DateTime?
-
-  // Loop mode tracking
-  isLoopIteration Boolean @default(false) // Was this execution triggered by loop mode?
-
-  latestSnapshot Json? // { content?, toolCalls?, contentBlocks? } during run; cleared on completion
-  // Status-driven polling (serverless): throttle and event accumulation so any instance can poll
+  id                   String    @id @default(cuid())
+  messageId            String    @unique
+  sandboxId            String
+  executionId          String?   @unique
+  status               String    @default("running")
+  startedAt            DateTime  @default(now())
+  completedAt          DateTime?
+  latestSnapshot       Json?
+  accumulatedEvents    Json?
   lastSnapshotPolledAt DateTime?
-  accumulatedEvents    Json? // full event list for building content when polling from different instances
+  isLoopIteration      Boolean   @default(false)
+  message              Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([sandboxId, status])
-}
-
-// Activity log for tracking platform usage metrics
-model ActivityLog {
-  id     String @id @default(cuid())
-  userId String
-
-  action   String // "sandbox_created" | "sandbox_deleted" | "agent_executed"
-  metadata Json?  // { repoName, branchName, sandboxId, agent, model, etc. }
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
 }

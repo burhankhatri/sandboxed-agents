@@ -361,11 +361,26 @@ export function MobileSidebarDrawer({
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Branches
                 </span>
-                {activeRepo && (
-                  <span className="text-[10px] text-muted-foreground">
-                    {activeRepo.branches.length}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {activeRepo && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {activeRepo.branches.length}
+                    </span>
+                  )}
+                  {activeRepo && onAddBranch && (
+                    <button
+                      onClick={() => handleCreateBranch()}
+                      disabled={creating}
+                      className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                    >
+                      {creating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!activeRepo ? (
@@ -421,23 +436,6 @@ export function MobileSidebarDrawer({
             {activeRepo && onAddBranch && (
               <div className="border-t border-border p-3">
                 <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => handleCreateBranch()}
-                    disabled={creating || githubBranchesLoading}
-                    className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
-                  >
-                    {creating ? (
-                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    ) : (
-                      <Plus className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="truncate">{creating ? "Creating..." : "New branch"}</span>
-                  </button>
-
-                  {createError && (
-                    <p className="text-[11px] text-red-400">{createError}</p>
-                  )}
-
                   {/* Starting branch selector */}
                   <Popover open={baseBranchOpen} onOpenChange={handleBaseBranchOpenChange}>
                     <PopoverTrigger className="group flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground data-[state=open]:text-foreground cursor-pointer">
@@ -521,6 +519,23 @@ export function MobileSidebarDrawer({
                       </Command>
                     </PopoverContent>
                   </Popover>
+
+                  <button
+                    onClick={() => handleCreateBranch()}
+                    disabled={creating || githubBranchesLoading}
+                    className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                  >
+                    {creating ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span className="truncate">{creating ? "Creating..." : "New branch"}</span>
+                  </button>
+
+                  {createError && (
+                    <p className="text-[11px] text-red-400">{createError}</p>
+                  )}
                 </div>
               </div>
             )}

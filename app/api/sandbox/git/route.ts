@@ -414,7 +414,10 @@ export async function POST(req: Request) {
           return badRequest(renameBranchError)
         }
 
-        // Rename on GitHub first via API, then sync locally
+        // Track whether branch exists on GitHub (for setting upstream later)
+        let branchExistsOnGitHub = false
+
+        // Try to rename on GitHub first via API
         // This ensures GitHub and sandbox stay in sync - if GitHub fails, we haven't touched local
         if (githubToken && repoOwner && repoApiName) {
           const renameRes = await fetch(
@@ -429,7 +432,11 @@ export async function POST(req: Request) {
               body: JSON.stringify({ new_name: newName }),
             }
           )
-          if (!renameRes.ok) {
+          if (renameRes.ok) {
+            branchExistsOnGitHub = true
+          } else if (renameRes.status !== 404) {
+            // 404 means branch doesn't exist on GitHub yet - that's okay, we'll push after local rename
+            // Any other error is a real failure
             const errorData = await renameRes.json().catch(() => ({}))
             const errorMessage = (errorData as { message?: string }).message || `Status ${renameRes.status}`
             return Response.json(
@@ -439,7 +446,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // GitHub rename succeeded (or no GitHub token), now sync local branch
+        // Rename local branch
         const renameResult = await sandbox.process.executeCommand(
           `cd ${repoPath} && git branch -m ${currentBranch} ${newName} 2>&1`
         )
@@ -447,11 +454,17 @@ export async function POST(req: Request) {
           return Response.json({ error: "Local rename failed: " + renameResult.result }, { status: 500 })
         }
 
-        // Set upstream tracking to the new remote branch name
+        // If branch existed on GitHub, set upstream tracking
+        // If branch didn't exist on GitHub, push the newly renamed branch
         if (githubToken) {
-          await sandbox.process.executeCommand(
-            `cd ${repoPath} && git branch -u origin/${newName} 2>&1`
-          )
+          if (branchExistsOnGitHub) {
+            await sandbox.process.executeCommand(
+              `cd ${repoPath} && git branch -u origin/${newName} 2>&1`
+            )
+          } else {
+            // Branch doesn't exist on GitHub yet - push with upstream tracking
+            await sandbox.git.push(repoPath, "x-access-token", githubToken)
+          }
         }
 
         // Update branch name in database

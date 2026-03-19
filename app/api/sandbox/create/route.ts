@@ -94,21 +94,27 @@ export async function POST(req: Request) {
         daytonaClient = new Daytona({ apiKey: daytonaApiKey })
         const sandboxName = generateSandboxName(userId)
 
-        // Get repository env vars if repo exists
+        // Repo env vars: from DB (encrypted). Prefer repoId when provided (must belong to user);
+        // otherwise resolve by owner/name so clients that omit repoId still get vars.
         let repoEnvVars: Record<string, string> = {}
-        if (repoId) {
-          const existingRepo = await prisma.repo.findUnique({
-            where: { id: repoId },
-            select: { envVars: true },
-          })
-          if (existingRepo?.envVars) {
-            const encryptedEnvVars = existingRepo.envVars as Record<string, string>
-            for (const [key, encryptedValue] of Object.entries(encryptedEnvVars)) {
-              try {
-                repoEnvVars[key] = decrypt(encryptedValue)
-              } catch {
-                // Skip keys that fail to decrypt
-              }
+        const repoForEnv = repoId
+          ? await prisma.repo.findFirst({
+              where: { id: repoId, userId },
+              select: { envVars: true },
+            })
+          : await prisma.repo.findUnique({
+              where: {
+                userId_owner_name: { userId, owner: repoOwner, name: repoName },
+              },
+              select: { envVars: true },
+            })
+        if (repoForEnv?.envVars) {
+          const encryptedEnvVars = repoForEnv.envVars as Record<string, string>
+          for (const [key, encryptedValue] of Object.entries(encryptedEnvVars)) {
+            try {
+              repoEnvVars[key] = decrypt(encryptedValue)
+            } catch {
+              // Skip keys that fail to decrypt
             }
           }
         }

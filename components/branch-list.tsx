@@ -183,6 +183,7 @@ export function BranchList({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          repoId: repo.id,
           repoOwner: repo.owner,
           repoName: repo.name,
           baseBranch: newBranchBase,

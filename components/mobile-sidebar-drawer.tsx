@@ -160,6 +160,7 @@ export function MobileSidebarDrawer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          repoId: activeRepo.id,
           repoOwner: activeRepo.owner,
           repoName: activeRepo.name,
           baseBranch,

@@ -178,7 +178,6 @@ export function DeleteBranchDialog({
       onConfirm(branch.id, deleteRemoteChecked)
     } finally {
       setIsDeleting(false)
-      setDeleteRemoteChecked(false)
     }
   }, [branch, deleteRemoteChecked, onConfirm])
 

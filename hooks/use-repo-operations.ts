@@ -123,14 +123,7 @@ export function useRepoOperations({
   const handleRemoveBranch = useCallback(async (branchId: string, deleteRemote?: boolean, activeBranchId?: string) => {
     if (!activeRepo) return
     const branch = activeRepo.branches.find((b) => b.id === branchId)
-
-    // Update UI state immediately for responsiveness
-    setRepos((prev) => removeBranchFromRepo(prev, activeRepo.id, branchId))
-
-    if (activeBranchId === branchId) {
-      const remaining = activeRepo.branches.filter((b) => b.id !== branchId)
-      setActiveBranchId(remaining[0]?.id ?? null)
-    }
+    const remainingAfterDeletion = activeRepo.branches.filter((b) => b.id !== branchId)
 
     // Delete remote branch if requested (must happen before sandbox is deleted)
     if (deleteRemote && branch?.sandboxId) {
@@ -165,6 +158,13 @@ export function useRepoOperations({
       }
     } catch (error) {
       console.error(`[handleRemoveBranch] Error deleting branch ${branchId}:`, error)
+    }
+
+    // Update UI after server deletion completes so row-level spinners can be shown immediately.
+    setRepos((prev) => removeBranchFromRepo(prev, activeRepo.id, branchId))
+
+    if (activeBranchId === branchId) {
+      setActiveBranchId(remainingAfterDeletion[0]?.id ?? null)
     }
 
     // Refresh quota

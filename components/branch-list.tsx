@@ -372,7 +372,11 @@ export function BranchList({
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-all hover:bg-muted-foreground/10 hover:text-foreground"
                   >
-                    <X className="h-4 w-4" />
+                      {deleteDialog.deletingBranchId === branch.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
                   </button>
                 </div>
               )

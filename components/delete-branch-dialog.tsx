@@ -234,7 +234,7 @@ export function DeleteBranchDialog({
 
 interface UseDeleteBranchDialogOptions {
   repo: Repo
-  onRemoveBranch: (branchId: string, deleteRemote?: boolean) => void
+  onRemoveBranch: (branchId: string, deleteRemote?: boolean) => Promise<void> | void
 }
 
 /**
@@ -243,6 +243,7 @@ interface UseDeleteBranchDialogOptions {
  */
 export function useDeleteBranchDialog({ repo, onRemoveBranch }: UseDeleteBranchDialogOptions) {
   const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null)
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null)
   // Used to ignore late-arriving background checks after the user closes/confirms the dialog.
   const deleteRequestBranchIdRef = useRef<string | null>(null)
 
@@ -253,6 +254,7 @@ export function useDeleteBranchDialog({ repo, onRemoveBranch }: UseDeleteBranchD
     // Optimistically open the modal immediately for instant feedback.
     deleteRequestBranchIdRef.current = branchId
     setDeletingBranch(branch)
+    setDeletingBranchId(branchId)
 
     // Background pre-check: if the branch doesn't exist on GitHub, we can skip showing the modal.
     // DeleteBranchDialog already handles merge-status checking, but this avoids a modal for missing remote branches.
@@ -270,7 +272,8 @@ export function useDeleteBranchDialog({ repo, onRemoveBranch }: UseDeleteBranchD
         if (deleteRequestBranchIdRef.current !== branchId) return
         deleteRequestBranchIdRef.current = null
         setDeletingBranch(null)
-        onRemoveBranch(branchId, false)
+        await onRemoveBranch(branchId, false)
+        setDeletingBranchId(null)
       } catch {
         // Ignore background pre-check errors; modal will handle merge-status.
       }
@@ -280,16 +283,22 @@ export function useDeleteBranchDialog({ repo, onRemoveBranch }: UseDeleteBranchD
   const handleClose = useCallback(() => {
     deleteRequestBranchIdRef.current = null
     setDeletingBranch(null)
+    setDeletingBranchId(null)
   }, [])
 
-  const handleConfirm = useCallback((branchId: string, deleteRemote: boolean) => {
-    onRemoveBranch(branchId, deleteRemote)
-    deleteRequestBranchIdRef.current = null
-    setDeletingBranch(null)
-  }, [onRemoveBranch])
+  const handleConfirm = useCallback(
+    async (branchId: string, deleteRemote: boolean) => {
+      deleteRequestBranchIdRef.current = null
+      setDeletingBranch(null)
+      await onRemoveBranch(branchId, deleteRemote)
+      setDeletingBranchId(null)
+    },
+    [onRemoveBranch]
+  )
 
   return {
     deletingBranch,
+    deletingBranchId,
     handleDeleteClick,
     handleClose,
     handleConfirm,

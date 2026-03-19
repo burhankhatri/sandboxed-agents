@@ -94,10 +94,9 @@ export function ChatPanel({
     globalActiveBranchIdRef.current = branch.id
   }, [branch.id])
 
-  // When a new branch is created, focus the chat input immediately on mobile.
+  // When a new branch is created, focus the chat input immediately.
   // We only do this for branches in "creating" state to avoid stealing focus during normal navigation.
   useEffect(() => {
-    if (!isMobile) return
     if (branch.status !== BRANCH_STATUS.CREATING) return
     const t = window.setTimeout(() => {
       if (textareaRef.current && document.activeElement !== textareaRef.current) {
@@ -105,7 +104,7 @@ export function ChatPanel({
       }
     }, 0)
     return () => window.clearTimeout(t)
-  }, [branch.id, branch.status, isMobile])
+  }, [branch.id, branch.status])
 
   // State for agent switch dialog
   const [pendingAgentSwitch, setPendingAgentSwitch] = useState<Agent | null>(null)

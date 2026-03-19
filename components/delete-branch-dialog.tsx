@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import type { Branch, Repo } from "@/lib/types"
-import { MERGE_STATUS, type MergeStatus } from "@/lib/constants"
+import { BRANCH_STATUS, MERGE_STATUS, type MergeStatus } from "@/lib/constants"
 
 // =============================================================================
 // Types
@@ -253,6 +253,9 @@ export function useDeleteBranchDialog({ repo, onRemoveBranch }: UseDeleteBranchD
   const handleDeleteClick = useCallback(async (branchId: string) => {
     const branch = repo.branches.find((b) => b.id === branchId)
     if (!branch) return
+
+    // Never allow deletion while the sandbox/branch is still being created.
+    if (branch.status === BRANCH_STATUS.CREATING) return
 
     setDeletingBranchId(branchId)
 

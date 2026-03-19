@@ -547,7 +547,8 @@ export function MobileSidebarDrawer({
                               e.stopPropagation()
                               deleteDialog.handleDeleteClick(branch.id)
                             }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted-foreground/10 hover:text-foreground"
+                            disabled={branch.status === BRANCH_STATUS.CREATING || deleteDialog.deletingBranchId === branch.id}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted-foreground/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                             title="Delete branch"
                           >
                             {deleteDialog.deletingBranchId === branch.id ? (

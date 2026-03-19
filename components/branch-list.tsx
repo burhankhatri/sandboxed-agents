@@ -335,6 +335,7 @@ export function BranchList({
               const isActive = branch.id === activeBranchId
               const isBold = branch.status === BRANCH_STATUS.RUNNING || branch.status === BRANCH_STATUS.CREATING || (branch.unread && !isActive)
               const isDeleting = deleteDialog.deletingBranchId === branch.id
+              const isCreating = branch.status === BRANCH_STATUS.CREATING
               return (
                 <div key={branch.id} className="group relative">
                   <button
@@ -371,10 +372,11 @@ export function BranchList({
                       e.stopPropagation()
                       deleteDialog.handleDeleteClick(branch.id)
                     }}
-                    disabled={isDeleting}
+                    disabled={isDeleting || isCreating}
                     className={cn(
                       "absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-muted-foreground/60 transition-all hover:bg-muted-foreground/10 hover:text-foreground",
-                      isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      (isDeleting || isCreating) && "cursor-not-allowed"
                     )}
                   >
                     {isDeleting ? (

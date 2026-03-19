@@ -64,6 +64,15 @@ function MergeStatusDisplay({
   onDeleteRemoteChange,
   isDeleting,
 }: MergeStatusDisplayProps) {
+  if (isDeleting) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        <span>Removing branch...</span>
+      </div>
+    )
+  }
+
   if (status === MERGE_STATUS.LOADING) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">

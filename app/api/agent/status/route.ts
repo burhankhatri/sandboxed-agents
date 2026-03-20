@@ -104,7 +104,7 @@ export async function POST(req: Request) {
               const agent = branch.agent as Agent | undefined
               // Use same canonical Daytona sandbox ID as execute (sandboxRecord.sandboxId) so we read the same meta.json
               const daytonaSandboxId = sandboxRecord.sandboxId
-              const { sandbox, env } = await ensureSandboxReady(
+              const { sandbox } = await ensureSandboxReady(
                 daytonaApiKey,
                 daytonaSandboxId,
                 actualRepoName,
@@ -126,7 +126,6 @@ export async function POST(req: Request) {
                 repoPath,
                 previewUrlPattern: branch.previewUrlPattern ?? sandboxRecord.previewUrlPattern ?? undefined,
                 model: branch.model ?? undefined,
-                env,
                 agent,
               })
 

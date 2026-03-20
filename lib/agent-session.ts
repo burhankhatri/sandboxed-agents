@@ -333,7 +333,6 @@ export interface PollBackgroundOptions {
   repoPath: string
   previewUrlPattern?: string
   model?: string
-  env?: Record<string, string>
   agent?: Agent
   /** AgentExecution.id – each poll writes latest snapshot to DB for status API. */
   agentExecutionId: string
@@ -354,14 +353,13 @@ export async function pollBackgroundAgent(
     const modelToUse = options.model === "default" ? undefined : options.model
 
     // Cast sandbox for SDK version compatibility
-    // Must pass full session options when reattaching - SDK recreates the provider
+    // getBackgroundSession only needs sandbox + backgroundSessionId for polling (no env needed)
 
     const bgSession = await sdkGetBackgroundSession({
       sandbox: sandbox as unknown as NonNullable<BackgroundSessionOptions['sandbox']>,
       backgroundSessionId,
       systemPrompt,
       model: modelToUse,
-      env: options.env,
     })
 
     const isRunning = await bgSession.isRunning()

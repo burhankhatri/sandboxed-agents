@@ -385,9 +385,10 @@ export function ChatPanel({
               if (line.startsWith("data: ")) {
                 try {
                   const eventData = JSON.parse(line.slice(6))
-                  if (eventData.type === "done" && eventData.data) {
-                    sandboxId = eventData.data.sandboxId
-                    previewUrlPattern = eventData.data.previewUrlPattern
+                  if (eventData.type === "done") {
+                    // sendDone spreads data directly onto event, not nested under 'data'
+                    sandboxId = eventData.sandboxId
+                    previewUrlPattern = eventData.previewUrlPattern
                   } else if (eventData.type === "error") {
                     // Capture error from SSE stream
                     sseError = eventData.message || eventData.error || "Unknown error during sandbox creation"

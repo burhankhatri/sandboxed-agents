@@ -3,6 +3,7 @@ import { readPersistedSessionId } from "@/lib/agent-session"
 import { PATHS, SANDBOX_CONFIG } from "@/lib/constants"
 import { prisma } from "@/lib/prisma"
 import { buildMcpConfig, getMcpConfigWriteCommand } from "@/lib/mcp-config"
+import { decrypt } from "@/lib/encryption"
 import type { Agent } from "@/lib/types"
 
 /**
@@ -13,6 +14,40 @@ export class SandboxNotFoundError extends Error {
   constructor(public sandboxId: string) {
     super(`Sandbox ${sandboxId} not found in Daytona - it may have been deleted`)
     this.name = "SandboxNotFoundError"
+  }
+}
+
+/**
+ * Decrypts repo-level environment variables.
+ * Returns empty object if no env vars or decryption fails.
+ */
+async function getRepoEnvVars(repoId?: string): Promise<Record<string, string>> {
+  if (!repoId) return {}
+
+  try {
+    const repo = await prisma.repo.findUnique({
+      where: { id: repoId },
+      select: { envVars: true },
+    })
+
+    if (!repo?.envVars) return {}
+
+    const encryptedEnvVars = repo.envVars as Record<string, string>
+    const decryptedEnvVars: Record<string, string> = {}
+
+    for (const [key, encryptedValue] of Object.entries(encryptedEnvVars)) {
+      try {
+        decryptedEnvVars[key] = decrypt(encryptedValue)
+      } catch {
+        // Skip keys that fail to decrypt
+        console.warn(`[getRepoEnvVars] Failed to decrypt env var: ${key}`)
+      }
+    }
+
+    return decryptedEnvVars
+  } catch (err) {
+    console.error("[getRepoEnvVars] Failed to fetch repo env vars:", err)
+    return {}
   }
 }
 
@@ -170,13 +205,19 @@ export async function ensureSandboxReady(
     }
   }
 
-  // Get environment variables based on model and agent
-  const env = getEnvForModel(model, agent, {
+  // Get environment variables based on model and agent (API keys)
+  const apiKeyEnv = getEnvForModel(model, agent, {
     anthropicApiKey,
     anthropicAuthType,
     openaiApiKey,
     opencodeApiKey,
   })
+
+  // Get user-provided repo-level env vars (decrypted)
+  const repoEnv = await getRepoEnvVars(repoId)
+
+  // Merge: repo env vars first, then API keys (API keys take precedence if same key)
+  const env = { ...repoEnv, ...apiKeyEnv }
 
   return {
     sandbox,

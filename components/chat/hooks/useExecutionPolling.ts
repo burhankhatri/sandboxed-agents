@@ -3,6 +3,7 @@ import type { Branch, Message } from "@/lib/types"
 import { generateId } from "@/lib/store"
 import { BRANCH_STATUS, EXECUTION_STATUS, PATHS } from "@/lib/constants"
 import { isLoopFinished, LOOP_CONTINUATION_MESSAGE } from "@/lib/types"
+import { toast } from "@/hooks/use-toast"
 
 interface UseExecutionPollingOptions {
   branch: Branch
@@ -90,7 +91,7 @@ export function useExecutionPolling({
     try {
       // Optionally run auto-commit first
       if (runAutoCommit) {
-        await fetch("/api/sandbox/git", {
+        const autoCommitRes = await fetch("/api/sandbox/git", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -100,6 +101,17 @@ export function useExecutionPolling({
             branchName: currentBranchName,
           }),
         })
+
+        // Show error toast if push failed
+        if (!autoCommitRes.ok) {
+          const errorData = await autoCommitRes.json().catch(() => ({}))
+          const errorMessage = (errorData as { error?: string }).error || `Push failed (${autoCommitRes.status})`
+          toast({
+            variant: "destructive",
+            title: "Push failed",
+            description: errorMessage,
+          })
+        }
       }
 
       // Check for new commits since lastShownCommitHash

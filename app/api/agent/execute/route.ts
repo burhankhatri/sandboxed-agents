@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { ensureSandboxReady } from "@/lib/sandbox-resume"
+import { ensureSandboxReady, SandboxNotFoundError } from "@/lib/sandbox-resume"
 import { createBackgroundAgentSession } from "@/lib/agent-session"
 import {
   requireAuth,
@@ -176,7 +176,26 @@ export async function POST(req: Request) {
 
     return Response.json({ success: true, messageId, executionId: agentExecution.id })
   } catch (error: unknown) {
-    // Sync steps failed (sandbox not ready, session creation failed)
+    // Handle sandbox not found - tell frontend to recreate
+    if (error instanceof SandboxNotFoundError) {
+      // Clean up the stale sandbox record from DB
+      await prisma.sandbox.delete({ where: { id: sandboxRecord.id } }).catch(() => {})
+
+      // Return info needed for frontend to recreate
+      // Only branchId is needed - the create endpoint will fetch branch details
+      return Response.json(
+        {
+          error: "SANDBOX_NOT_FOUND",
+          message: "Sandbox was deleted and needs to be recreated",
+          recreateInfo: {
+            branchId: sandboxRecord.branch?.id,
+          },
+        },
+        { status: 410 } // 410 Gone - resource no longer available
+      )
+    }
+
+    // Other errors - sandbox not ready, session creation failed
     await resetSandboxStatus(sandboxRecord.id, sandboxRecord.branch?.id)
     return internalError(error)
   }

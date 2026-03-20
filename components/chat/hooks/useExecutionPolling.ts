@@ -444,15 +444,16 @@ export function useExecutionPolling({
             !isLoopFinished(data.content)
 
           if (shouldContinueLoop && completedBranchId) {
-            // Increment loop count and trigger continuation immediately
-            // Don't set status to idle - keep it running for seamless continuation
+            // Increment loop count and set status to running immediately
+            // This prevents the cron job from also triggering a continuation (race condition)
             const newLoopCount = loopCountRef.current + 1
             onUpdateBranch(completedBranchId, {
+              status: "running",
               loopCount: newLoopCount,
               lastActivity: "now",
               lastActivityTs: Date.now(),
             })
-            // Trigger loop continuation immediately
+            // Trigger loop continuation
             onLoopContinue?.(completedBranchId)
           } else {
             // Normal completion - set status to idle

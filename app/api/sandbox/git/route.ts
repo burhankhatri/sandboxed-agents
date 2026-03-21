@@ -206,8 +206,10 @@ export async function POST(req: Request) {
         const aheadResult = await sandbox.process.executeCommand(
           `cd ${repoPath} && git rev-list @{upstream}..HEAD --count 2>&1`
         )
-        // If no upstream configured (new branch), we need to push
-        const noUpstream = aheadResult.exitCode !== 0 || aheadResult.result.includes("no upstream")
+        // If no upstream configured or remote branch doesn't exist yet, we need to push
+        const noUpstream = aheadResult.exitCode !== 0 ||
+          aheadResult.result.includes("no upstream") ||
+          aheadResult.result.includes("not stored as a remote-tracking")
         const aheadCount = noUpstream ? 1 : (parseInt(aheadResult.result.trim(), 10) || 0)
         let pushed = false
         if (aheadCount > 0) {

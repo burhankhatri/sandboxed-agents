@@ -22,14 +22,17 @@ const CLAUDE_SETTINGS = JSON.parse(
  * This uploads the hook scripts and settings file directly to the sandbox.
  */
 export async function setupClaudeHooks(
-  sandbox: { fs: { uploadFile: (content: string, path: string) => Promise<void> }; process: { executeCommand: (cmd: string) => Promise<unknown> } }
+  sandbox: {
+    fs: { uploadFile: (source: string | Buffer, destination: string) => Promise<void> }
+    process: { executeCommand: (cmd: string) => Promise<unknown> }
+  }
 ): Promise<void> {
   // Create the hooks directory
   await sandbox.process.executeCommand(`mkdir -p ${PATHS.CLAUDE_HOOKS_DIR}`)
 
   // Upload the hook script
   await sandbox.fs.uploadFile(
-    PREVENT_GIT_AMEND_SCRIPT,
+    Buffer.from(PREVENT_GIT_AMEND_SCRIPT, "utf-8"),
     `${PATHS.CLAUDE_HOOKS_DIR}/prevent-git-amend.sh`
   )
 
@@ -58,7 +61,7 @@ export async function setupClaudeHooks(
   }
 
   await sandbox.fs.uploadFile(
-    JSON.stringify(existing, null, 2),
+    Buffer.from(JSON.stringify(existing, null, 2), "utf-8"),
     PATHS.CLAUDE_SETTINGS_FILE
   )
 

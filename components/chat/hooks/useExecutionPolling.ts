@@ -46,6 +46,11 @@ export function useExecutionPolling({
   const startPollingRef = useRef<(messageId: string, executionId?: string) => void>(() => {})
   const completionHandledRef = useRef(false)
   const pollingBranchIdRef = useRef<string | null>(null)
+  // Guard to prevent multiple startPolling calls from racing
+  // Set synchronously at the start of startPolling, before any async work
+  const pollingActiveRef = useRef(false)
+  // Guard to prevent detectAndShowCommits from running multiple times for the same execution
+  const commitDetectionRunningRef = useRef(false)
 
   // Store the branch context at polling start time to avoid using wrong branch data
   // when the user switches branches during execution. These are ONLY updated when
@@ -73,12 +78,20 @@ export function useExecutionPolling({
    * @param runAutoCommit - Whether to run auto-commit before checking for commits
    */
   const detectAndShowCommits = useCallback(async (runAutoCommit: boolean = true) => {
+    // Prevent concurrent runs - this can happen if multiple polling instances complete
+    // or if stopPolling races with normal completion
+    if (commitDetectionRunningRef.current) return
+    commitDetectionRunningRef.current = true
+
     // Use the branch context captured at polling start, not the currently viewed branch
     const currentSandboxId = pollingBranchSandboxIdRef.current
     const currentBranchName = pollingBranchNameRef.current
     const targetBranchId = pollingBranchIdRef.current
 
-    if (!currentSandboxId || !targetBranchId) return
+    if (!currentSandboxId || !targetBranchId) {
+      commitDetectionRunningRef.current = false
+      return
+    }
 
     try {
       // Optionally run auto-commit first
@@ -171,6 +184,8 @@ export function useExecutionPolling({
       }
     } catch {
       // Non-critical - commit detection failure shouldn't break the flow
+    } finally {
+      commitDetectionRunningRef.current = false
     }
   }, [repoName, onAddMessage, onCommitsDetected])
 
@@ -186,6 +201,11 @@ export function useExecutionPolling({
 
   // Start polling for execution status via HTTP snapshots
   const startPolling = useCallback((messageId: string, executionId?: string) => {
+    // Prevent concurrent startPolling calls - this guard is checked synchronously
+    // before any async work begins, preventing race conditions in the useEffect
+    if (pollingActiveRef.current) return
+    pollingActiveRef.current = true
+
     // Capture the branch context at polling start time
     // This ensures we use the correct branch data even if the user switches branches
     pollingBranchIdRef.current = branch.id
@@ -193,6 +213,8 @@ export function useExecutionPolling({
     pollingBranchSandboxIdRef.current = branch.sandboxId
     pollingBranchMessagesRef.current = branch.messages
     pollingLastShownCommitHashRef.current = branch.lastShownCommitHash || null
+    // Reset commit detection guard for new execution
+    commitDetectionRunningRef.current = false
 
     if (streamingMessageIdRef) {
       streamingMessageIdRef.current = messageId
@@ -243,6 +265,7 @@ export function useExecutionPolling({
                 clearInterval(pollingRef.current)
                 pollingRef.current = null
               }
+              pollingActiveRef.current = false
               currentExecutionIdRef.current = null
               currentMessageIdRef.current = null
               appendStoppedWithoutEndNote()
@@ -269,6 +292,7 @@ export function useExecutionPolling({
             clearInterval(pollingRef.current)
             pollingRef.current = null
           }
+          pollingActiveRef.current = false
           currentExecutionIdRef.current = null
           currentMessageIdRef.current = null
           if (streamingMessageIdRef) streamingMessageIdRef.current = null
@@ -354,6 +378,7 @@ export function useExecutionPolling({
             clearInterval(pollingRef.current)
             pollingRef.current = null
           }
+          pollingActiveRef.current = false
           currentExecutionIdRef.current = null
           currentMessageIdRef.current = null
 
@@ -534,6 +559,7 @@ export function useExecutionPolling({
       clearInterval(pollingRef.current)
       pollingRef.current = null
     }
+    pollingActiveRef.current = false
     if (currentMessageIdRef.current && pollingBranchIdRef.current) {
       // Use the captured branch messages from polling start to avoid using wrong branch data
       const lastMsg = pollingBranchMessagesRef.current.find(m => m.id === currentMessageIdRef.current)
@@ -566,7 +592,8 @@ export function useExecutionPolling({
   // Check and resume polling on mount/branch switch
   useEffect(() => {
     if (!branch.sandboxId) return
-    if (pollingRef.current) return
+    // Use pollingActiveRef for the guard - it's set synchronously at the start of startPolling
+    if (pollingActiveRef.current) return
 
     const currentStatus = branch.status
     const currentMessages = branch.messages
@@ -592,7 +619,7 @@ export function useExecutionPolling({
             .then((r) => r.json())
             .then((execData) => {
               if (execData.execution && execData.execution.status === EXECUTION_STATUS.RUNNING) {
-                if (pollingRef.current) return
+                if (pollingActiveRef.current) return
                 // Update branch status to RUNNING if it wasn't already - this ensures spinner shows
                 if (currentStatus !== BRANCH_STATUS.RUNNING) {
                   onUpdateBranch(branch.id, { status: BRANCH_STATUS.RUNNING })
@@ -614,7 +641,7 @@ export function useExecutionPolling({
                 }
                 // Execution row may not exist yet if user switched immediately after send; retry once
                 const retryResume = () => {
-                  if (pollingRef.current) return
+                  if (pollingActiveRef.current) return
                   fetch("/api/agent/execution/active", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -622,7 +649,7 @@ export function useExecutionPolling({
                   })
                     .then((r) => r.json())
                     .then((retryData) => {
-                      if (pollingRef.current) return
+                      if (pollingActiveRef.current) return
                       if (retryData.execution && retryData.execution.status === EXECUTION_STATUS.RUNNING) {
                         currentMessageIdRef.current = retryData.execution.messageId
                         currentExecutionIdRef.current = retryData.execution.executionId
@@ -633,7 +660,7 @@ export function useExecutionPolling({
                       startPollingRef.current(lastAssistantMsg.id)
                     })
                     .catch(() => {
-                      if (pollingRef.current) return
+                      if (pollingActiveRef.current) return
                       currentMessageIdRef.current = lastAssistantMsg.id
                       startPollingRef.current(lastAssistantMsg.id)
                     })

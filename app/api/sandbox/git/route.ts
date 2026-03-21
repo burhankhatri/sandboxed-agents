@@ -202,17 +202,26 @@ export async function POST(req: Request) {
         if (verifyStatus.currentBranch !== branchName) {
           return badRequest(`Branch changed during operation: expected ${branchName} but on ${verifyStatus.currentBranch}`)
         }
-        // Check if there are unpushed commits (or no upstream yet)
+        // Check if there are unpushed commits
+        // First try origin/branchName, fall back to checking if remote branch exists
         const aheadResult = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git rev-list @{upstream}..HEAD --count 2>&1`
+          `cd ${repoPath} && git rev-list origin/${branchName}..HEAD --count 2>/dev/null || echo "no-remote"`
         )
-        // If no upstream configured or remote branch doesn't exist yet, we need to push
-        const noUpstream = aheadResult.exitCode !== 0 ||
-          aheadResult.result.includes("no upstream") ||
-          aheadResult.result.includes("not stored as a remote-tracking")
-        const aheadCount = noUpstream ? 1 : (parseInt(aheadResult.result.trim(), 10) || 0)
+        const resultTrimmed = aheadResult.result.trim()
+        // If remote branch doesn't exist, check if we have any commits at all
+        let needsPush = false
+        if (resultTrimmed === "no-remote") {
+          // Remote branch doesn't exist - check if local branch has commits
+          const hasCommits = await sandbox.process.executeCommand(
+            `cd ${repoPath} && git rev-parse HEAD 2>/dev/null && echo "has-commits"`
+          )
+          needsPush = hasCommits.result.includes("has-commits")
+        } else {
+          const aheadCount = parseInt(resultTrimmed, 10) || 0
+          needsPush = aheadCount > 0
+        }
         let pushed = false
-        if (aheadCount > 0) {
+        if (needsPush) {
           const pushResult = await pushWithRetry(sandbox, repoPath, githubToken)
           if (!pushResult.success) {
             return Response.json({ error: "Push failed: " + pushResult.error }, { status: 500 })

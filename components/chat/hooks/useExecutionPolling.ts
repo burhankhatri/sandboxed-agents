@@ -44,6 +44,7 @@ export function useExecutionPolling({
   const currentExecutionIdRef = useRef<string | null>(null)
   const currentMessageIdRef = useRef<string | null>(null)
   const startPollingRef = useRef<(messageId: string, executionId?: string) => void>(() => {})
+  const completionHandledRef = useRef(false)
   const pollingBranchIdRef = useRef<string | null>(null)
   // Use refs to always get the latest branch name/sandboxId in the polling callback
   // This prevents stale closures when the branch is renamed during polling
@@ -203,7 +204,8 @@ export function useExecutionPolling({
 
     let notFoundRetries = 0
     const MAX_NOT_FOUND_RETRIES = 10
-    let completionHandled = false
+    // Reset completion flag for new polling session
+    completionHandledRef.current = false
 
     const STOPPED_WITHOUT_END_NOTE =
       "\n\n---\n*Agent stopped without responding. Please try again.*"
@@ -338,8 +340,8 @@ export function useExecutionPolling({
           data.status === EXECUTION_STATUS.COMPLETED ||
           data.status === EXECUTION_STATUS.ERROR
         ) {
-          if (completionHandled) return
-          completionHandled = true
+          if (completionHandledRef.current) return
+          completionHandledRef.current = true
 
           const completedBranchIdForLog = pollingBranchIdRef.current
           const viewingBranchId = globalActiveBranchIdRef?.current ?? activeBranchIdRef.current

@@ -401,7 +401,7 @@ For long-running tasks, the app supports background execution that continues eve
 
 1. **Initiation**: Frontend calls `/api/agent/execute` instead of `/api/agent/query`
 2. **Server-side Processing**: Agent runs in Daytona sandbox, events saved to `AgentExecution`
-3. **Polling**: `BackgroundExecutionPoller` component polls `/api/agent/execution/active`
+3. **Polling**: `ChatPanel` polls `/api/agent/status` for the active branch; `useSyncData` syncs status for background branches
 4. **Snapshot Updates**: Server saves snapshots every 500ms (throttled)
 5. **Resumption**: On page reload, active executions are detected and resumed in UI
 

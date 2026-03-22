@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import { RepoSidebar } from "@/components/repo-sidebar"
 import { BranchList } from "@/components/branch-list"
 import { ChatPanel, EmptyChatPanel } from "@/components/chat-panel"
-import { BackgroundExecutionPoller } from "@/components/chat/background-execution-poller"
 import { GitHistoryPanel } from "@/components/git-history-panel"
 import { GitHistorySheet } from "@/components/git-history-sheet"
 import { SettingsModal } from "@/components/settings-modal"
@@ -271,28 +270,6 @@ export default function Home() {
 
   return (
     <>
-      {repos.flatMap((r) =>
-        r.branches
-          .filter(
-            (b) =>
-              (b.status === BRANCH_STATUS.RUNNING || b.status === BRANCH_STATUS.CREATING) &&
-              b.id !== activeBranchId
-          )
-          .map((b) => (
-            <BackgroundExecutionPoller
-              key={b.id}
-              branch={b}
-              repoName={r.name}
-              onUpdateMessage={handleUpdateMessage}
-              onUpdateBranch={handleUpdateBranch}
-              onAddMessage={handleAddMessage}
-              onForceSave={() => {}}
-              onCommitsDetected={() => setGitHistoryRefreshTrigger((n) => n + 1)}
-              streamingMessageIdRef={streamingMessageIdRef}
-              globalActiveBranchIdRef={activeBranchIdRef}
-            />
-          ))
-      )}
       <main className="flex h-dvh overflow-hidden">
         {/* Repo Sidebar - desktop only */}
         {!isMobile && (

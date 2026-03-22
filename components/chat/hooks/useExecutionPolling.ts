@@ -189,15 +189,18 @@ export function useExecutionPolling({
     }
   }, [repoName, onAddMessage, onCommitsDetected])
 
-  // Cleanup polling on unmount
+  // Cleanup polling on unmount OR when branch changes
+  // This prevents accumulating multiple pollers when switching between branches
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
         pollingRef.current = null
       }
+      // Reset the polling active flag so the new branch can start fresh
+      pollingActiveRef.current = false
     }
-  }, [])
+  }, [branch.id])
 
   // Start polling for execution status via HTTP snapshots
   const startPolling = useCallback((messageId: string, executionId?: string) => {

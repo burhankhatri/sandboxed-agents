@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import type { Branch } from "@/lib/types"
 import type { TransformedRepo } from "@/lib/db-types"
-import { BRANCH_STATUS } from "@/lib/constants"
+import { toggleSandbox, createPR } from "@/lib/git-actions"
 
 interface UseMobileHandlersOptions {
   activeBranch: Branch | null
@@ -28,20 +28,10 @@ export function useMobileHandlers({
   // Toggle sandbox start/stop
   const handleMobileSandboxToggle = useCallback(async () => {
     if (!activeBranch?.sandboxId || mobileSandboxToggleLoading) return
-    const isStopped = activeBranch.status === BRANCH_STATUS.STOPPED
     setMobileSandboxToggleLoading(true)
     try {
-      const res = await fetch("/api/sandbox/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sandboxId: activeBranch.sandboxId,
-          action: isStopped ? "start" : "stop",
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      handleUpdateBranch(activeBranch.id, { status: isStopped ? BRANCH_STATUS.IDLE : BRANCH_STATUS.STOPPED })
+      const result = await toggleSandbox(activeBranch.sandboxId, activeBranch.status)
+      handleUpdateBranch(activeBranch.id, { status: result.newStatus })
     } catch {
       // ignore
     } finally {
@@ -59,20 +49,9 @@ export function useMobileHandlers({
     }
     setMobilePrLoading(true)
     try {
-      const res = await fetch("/api/github/pr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          owner: activeRepo.owner,
-          repo: activeRepo.name,
-          head: activeBranch.name,
-          base: activeBranch.baseBranch,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      handleUpdateBranch(activeBranch.id, { prUrl: data.url })
-      window.open(data.url, "_blank")
+      const result = await createPR(activeRepo.owner, activeRepo.name, activeBranch.name, activeBranch.baseBranch)
+      handleUpdateBranch(activeBranch.id, { prUrl: result.url })
+      window.open(result.url, "_blank")
     } catch {
       // Silently fail
     } finally {

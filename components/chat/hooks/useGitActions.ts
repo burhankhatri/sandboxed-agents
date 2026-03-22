@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from "react"
 import type { Branch, Message } from "@/lib/types"
 import { generateId } from "@/lib/store"
-import { BRANCH_STATUS, PATHS } from "@/lib/constants"
+import { PATHS } from "@/lib/constants"
 import { useGitDialogs } from "@/components/git/hooks/useGitDialogs"
+import { toggleSandbox, createPR } from "@/lib/git-actions"
 
 // Export the return type for use in sub-components
 export type UseGitActionsReturn = ReturnType<typeof useGitActions>
@@ -100,20 +101,10 @@ export function useGitActions({
 
   const handleSandboxToggle = useCallback(async () => {
     if (!branch.sandboxId || sandboxToggleLoading) return
-    const isStopped = branch.status === BRANCH_STATUS.STOPPED
     setSandboxToggleLoading(true)
     try {
-      const res = await fetch("/api/sandbox/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sandboxId: branch.sandboxId,
-          action: isStopped ? "start" : "stop",
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      onUpdateBranch(branch.id, { status: isStopped ? BRANCH_STATUS.IDLE : BRANCH_STATUS.STOPPED })
+      const result = await toggleSandbox(branch.sandboxId, branch.status)
+      onUpdateBranch(branch.id, { status: result.newStatus })
     } catch {
       // ignore
     } finally {
@@ -129,20 +120,9 @@ export function useGitActions({
     const [owner, repo] = repoFullName.split("/")
     setActionLoading("create-pr")
     try {
-      const res = await fetch("/api/github/pr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          owner,
-          repo,
-          head: branch.name,
-          base: branch.baseBranch,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      onUpdateBranch(branch.id, { prUrl: data.url })
-      window.open(data.url, "_blank")
+      const result = await createPR(owner, repo, branch.name, branch.baseBranch)
+      onUpdateBranch(branch.id, { prUrl: result.url })
+      window.open(result.url, "_blank")
     } catch {
       // Silently fail
     } finally {

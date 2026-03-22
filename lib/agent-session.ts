@@ -103,6 +103,9 @@ export function buildSystemPrompt(
   repoPath: string,
   previewUrlPattern?: string
 ): string {
+  // NOTE: The lines about --amend are specifically for Claude Code, which has a tendency to
+  // use git commit --amend. We don't want this because we only fast-forward push, so amending
+  // would cause the push to fail (non-fast-forward error).
   let prompt = `You are an AI coding agent running in a Daytona sandbox.
 The repository is cloned at ${repoPath}.
 You are working on the git branch that is currently checked out.

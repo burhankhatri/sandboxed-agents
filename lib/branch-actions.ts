@@ -1,4 +1,5 @@
 import { parseSSEStream } from "./sse-utils"
+import type { Agent } from "./types"
 
 /**
  * Branch creation utilities - shared between desktop and mobile
@@ -19,7 +20,7 @@ export interface CreateBranchResult {
   contextId?: string
   previewUrlPattern?: string
   startCommit?: string
-  agent?: string
+  agent?: Agent
 }
 
 export interface CreateBranchCallbacks {
@@ -75,7 +76,7 @@ export async function createBranchWithSandbox(
         contextId: event.contextId as string | undefined,
         previewUrlPattern: event.previewUrlPattern as string | undefined,
         startCommit: event.startCommit as string | undefined,
-        agent: event.agent as string | undefined,
+        agent: event.agent as Agent | undefined,
       })
     } else if (event.type === "error") {
       hasTerminalEvent = true

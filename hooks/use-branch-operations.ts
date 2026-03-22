@@ -28,16 +28,19 @@ export function useBranchOperations({
 }: UseBranchOperationsOptions) {
   // Update branch properties
   const handleUpdateBranch = useCallback((branchId: string, updates: Partial<Branch>) => {
-    if (!activeRepo) return
+    // Find the repo containing this branch - don't rely on activeRepo which may be stale
+    // during async operations like autoSuggestBranchName
+    const targetRepo = repos.find(r => r.branches.some(b => b.id === branchId))
+    if (!targetRepo) return
 
     // Find the branch to check its current status
-    const branch = activeRepo.branches.find((b) => b.id === branchId)
+    const branch = targetRepo.branches.find((b) => b.id === branchId)
     const isBeingCreated = branch?.status === BRANCH_STATUS.CREATING
 
     // The actual ID to use for database operations (might be a new server-side ID)
     const dbBranchId = updates.id || branchId
 
-    setRepos((prev) => updateBranchInRepo(prev, activeRepo.id, branchId, updates))
+    setRepos((prev) => updateBranchInRepo(prev, targetRepo.id, branchId, updates))
 
     // Also update activeBranchId if it's being replaced
     if (updates.id && activeBranchIdRef.current === branchId) {
@@ -56,7 +59,7 @@ export function useBranchOperations({
         body: JSON.stringify({ branchId: dbBranchId, ...updates }),
       }).catch(() => {})
     }
-  }, [activeRepo, setRepos, activeBranchIdRef, setActiveBranchId])
+  }, [repos, setRepos, activeBranchIdRef, setActiveBranchId])
 
   // Save draft prompt for a specific branch
   const handleSaveDraftForBranch = useCallback((branchId: string, draftPrompt: string) => {

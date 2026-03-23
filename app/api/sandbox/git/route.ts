@@ -46,18 +46,13 @@ async function pushWithRetry(
       await sandbox.git.push(repoPath, "x-access-token", githubToken)
       return { success: true }
     } catch (err: unknown) {
-      // Extract detailed error info from axios response if available
-      const axiosResponse = (err as { response?: { data?: unknown; status?: number } })?.response
+      // The Daytona SDK's axios interceptor already extracts the detailed error message
+      // from the API response and wraps it in a DaytonaError. The error.message already
+      // contains the extracted message (e.g., "authentication required" instead of
+      // "Request failed with status code 400").
+      //
+      // DaytonaError also has statusCode and headers properties if needed.
       let errorMessage = err instanceof Error ? err.message : String(err)
-      if (axiosResponse?.data) {
-        const data = axiosResponse.data
-        if (typeof data === "string") {
-          errorMessage = data
-        } else if (typeof data === "object" && data !== null) {
-          const dataObj = data as { message?: string; error?: string }
-          errorMessage = dataObj.message || dataObj.error || JSON.stringify(data)
-        }
-      }
 
       // If it's a transient error and we have retries left, wait and retry
       const isTransient =

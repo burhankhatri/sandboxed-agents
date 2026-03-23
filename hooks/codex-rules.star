@@ -1,8 +1,7 @@
 # Codex rules to prevent dangerous git operations
 # These rules block commands that rewrite history, push, or manipulate branches
 #
-# Note: Codex uses prefix_rule() which matches command prefixes.
-# We cannot use wildcards/regex, so we list common branch name patterns.
+# Note: git checkout and git switch are blocked entirely.
 # The system prompt tells agents to use "git restore" for file operations.
 
 # Block git commit --amend (history rewriting)
@@ -65,140 +64,16 @@ prefix_rule(
     justification="Renaming branches is not allowed.",
 )
 
-# Block git checkout -b (branch creation)
+# Block git checkout entirely (use "git restore" for file operations)
 prefix_rule(
-    pattern=["git", "checkout", "-b"],
+    pattern=["git", "checkout"],
     decision="forbidden",
-    justification="Creating new branches is not allowed.",
+    justification="git checkout is not allowed. Use 'git restore' to discard file changes.",
 )
 
-# Block git switch -c (branch creation)
+# Block git switch entirely
 prefix_rule(
-    pattern=["git", "switch", "-c"],
-    decision="forbidden",
-    justification="Creating new branches is not allowed.",
-)
-
-# Block git switch <branch> (branch switching)
-# Common branch names and patterns
-prefix_rule(
-    pattern=["git", "switch", "main"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "master"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "develop"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "dev"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "staging"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "production"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "feature/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "bugfix/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "hotfix/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "switch", "release/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-# Block git checkout <branch> (branch switching)
-# Common branch names and patterns
-prefix_rule(
-    pattern=["git", "checkout", "main"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "master"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "develop"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "dev"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "staging"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "production"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "feature/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "bugfix/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "hotfix/"],
-    decision="forbidden",
-    justification="Switching branches is not allowed. Stay on the current branch.",
-)
-
-prefix_rule(
-    pattern=["git", "checkout", "release/"],
+    pattern=["git", "switch"],
     decision="forbidden",
     justification="Switching branches is not allowed. Stay on the current branch.",
 )

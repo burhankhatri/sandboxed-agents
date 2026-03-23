@@ -7,6 +7,7 @@ import { decrypt } from "@/lib/encryption"
 import type { Agent } from "@/lib/types"
 import { setupClaudeHooks } from "@/lib/claude-hooks"
 import { setupOpenCodePermissions } from "@/lib/opencode-permissions"
+import { setupCodexRules } from "@/lib/codex-rules"
 
 /**
  * Error thrown when a sandbox is not found in Daytona but exists in the database.
@@ -199,6 +200,13 @@ export async function ensureSandboxReady(
     t0 = Date.now()
     await setupOpenCodePermissions(sandbox)
     console.log(`[ensureSandboxReady] opencode permissions written, took ${Date.now() - t0}ms`)
+  }
+
+  // Set up Codex rules on every resume to ensure they're always present
+  if (agent === "codex") {
+    t0 = Date.now()
+    await setupCodexRules(sandbox)
+    console.log(`[ensureSandboxReady] codex rules written, took ${Date.now() - t0}ms`)
   }
 
   // Write MCP server configurations if any are configured for this repo

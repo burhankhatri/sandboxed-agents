@@ -59,7 +59,6 @@ async function pushWithRetry(
         continue
       }
 
-      // Non-transient error or out of retries
       return { success: false, error: errorMessage }
     }
   }

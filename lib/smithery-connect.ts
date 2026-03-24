@@ -1,5 +1,6 @@
 import { encrypt } from "@/lib/encryption"
 import { prisma } from "@/lib/prisma"
+import { createHash } from "crypto"
 
 const SMITHERY_API_BASE = "https://api.smithery.ai"
 
@@ -43,8 +44,9 @@ async function getNamespace(apiKey: string): Promise<string | null> {
     console.error("[Smithery Connect] Failed to list namespaces:", err)
   }
 
-  // No namespaces exist — create one
-  const newName = `upstream-agents`
+  // No namespaces exist — create a unique one per API key
+  const keyHash = createHash("sha256").update(apiKey).digest("hex").slice(0, 8)
+  const newName = `upstream-${keyHash}`
   console.log("[Smithery Connect] Creating namespace:", newName)
   const ok = await ensureNamespace(newName, apiKey)
   if (ok) {
@@ -96,8 +98,12 @@ async function ensureNamespace(name: string, apiKey: string): Promise<boolean> {
       }
     )
 
-    if (!response.ok && response.status !== 409) {
+    if (!response.ok) {
       const body = await response.text()
+      // 409 means namespace already exists — only OK if we own it
+      if (response.status === 409 && !body.includes("another user")) {
+        return true
+      }
       console.error("[Smithery Connect] Failed to create namespace:", response.status, body)
       return false
     }

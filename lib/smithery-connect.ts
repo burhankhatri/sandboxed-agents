@@ -22,7 +22,7 @@ async function getNamespace(apiKey: string): Promise<string | null> {
     return null
   }
 
-  // Auto-detect: fetch user's existing namespaces
+  // Auto-detect: fetch user's existing namespaces or create one
   try {
     const response = await fetch(`${SMITHERY_API_BASE}/namespaces`, {
       headers: { "Authorization": `Bearer ${apiKey}` },
@@ -32,15 +32,20 @@ async function getNamespace(apiKey: string): Promise<string | null> {
       const namespaces = data.data || data.namespaces || data
       if (Array.isArray(namespaces) && namespaces.length > 0) {
         resolvedNamespace = namespaces[0].name
+        console.log("[Smithery Connect] Using existing namespace:", resolvedNamespace)
         return resolvedNamespace
       }
+    } else {
+      const body = await response.text()
+      console.error("[Smithery Connect] Failed to list namespaces:", response.status, body)
     }
   } catch (err) {
     console.error("[Smithery Connect] Failed to list namespaces:", err)
   }
 
   // No namespaces exist — create one
-  const newName = `upstream-${Date.now().toString(36)}`
+  const newName = `upstream-agents`
+  console.log("[Smithery Connect] Creating namespace:", newName)
   const ok = await ensureNamespace(newName, apiKey)
   if (ok) {
     resolvedNamespace = newName
@@ -92,7 +97,8 @@ async function ensureNamespace(name: string, apiKey: string): Promise<boolean> {
     )
 
     if (!response.ok && response.status !== 409) {
-      console.error("[Smithery Connect] Failed to create namespace:", response.status)
+      const body = await response.text()
+      console.error("[Smithery Connect] Failed to create namespace:", response.status, body)
       return false
     }
 

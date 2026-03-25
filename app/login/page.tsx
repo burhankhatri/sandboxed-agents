@@ -3,9 +3,9 @@
 import { signIn } from "next-auth/react"
 import { Github } from "lucide-react"
 import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
-export default function LoginPage() {
-  const terminalArt = "<°))><"
+function LoginContents() {
   const searchParams = useSearchParams()
   const forceConsent = searchParams.get("consent") === "1"
   return (
@@ -13,7 +13,7 @@ export default function LoginPage() {
       <div className="flex flex-col items-center gap-6 p-8">
         <div className="flex h-16 w-32 items-center justify-center rounded-2xl bg-secondary">
           <pre className="m-0 whitespace-pre text-center font-mono text-xl font-bold leading-none text-primary">
-            {terminalArt}
+            {"<°))><"}
           </pre>
         </div>
 
@@ -61,6 +61,18 @@ export default function LoginPage() {
         </a>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-background" />
+      }
+    >
+      <LoginContents />
+    </Suspense>
   )
 }
 

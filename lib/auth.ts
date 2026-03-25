@@ -12,9 +12,6 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           scope: "repo read:user",
-          // Force GitHub to show the authorization step again.
-          // This helps recover when a user revoked the app access and the stored token is now invalid.
-          prompt: "consent",
         },
       },
     }),

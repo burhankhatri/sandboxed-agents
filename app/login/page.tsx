@@ -2,9 +2,12 @@
 
 import { signIn } from "next-auth/react"
 import { Github } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 
 export default function LoginPage() {
   const terminalArt = "<°))><"
+  const searchParams = useSearchParams()
+  const forceConsent = searchParams.get("consent") === "1"
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 p-8">
@@ -22,7 +25,13 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={() => signIn("github", { callbackUrl: "/" })}
+          onClick={() =>
+            signIn(
+              "github",
+              { callbackUrl: "/" },
+              forceConsent ? { prompt: "consent" } : undefined
+            )
+          }
           className="flex cursor-pointer items-center gap-3 rounded-lg bg-[#24292f] px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[#24292f]/90"
         >
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
@@ -30,6 +39,12 @@ export default function LoginPage() {
           </svg>
           Sign in with GitHub
         </button>
+
+        {forceConsent && (
+          <p className="text-xs text-muted-foreground max-w-sm text-center">
+            Re-authorization enabled (requested via <span className="font-mono">?consent=1</span>).
+          </p>
+        )}
 
         <p className="text-xs text-muted-foreground">
           We&apos;ll request access to your repositories for the agent to work with

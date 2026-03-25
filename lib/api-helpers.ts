@@ -202,6 +202,29 @@ export interface GitHubAuthResult {
   token: string
 }
 
+async function getPreferredGitHubToken(userId: string): Promise<string | null> {
+  const [user, accounts] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubId: true },
+    }),
+    prisma.account.findMany({
+      where: { userId, provider: "github" },
+      select: { access_token: true, providerAccountId: true, id: true },
+      orderBy: { id: "asc" },
+    }),
+  ])
+
+  if (accounts.length === 0) return null
+
+  const preferred = user?.githubId
+    ? accounts.find((account) => account.providerAccountId === user.githubId)
+    : undefined
+
+  const fallback = accounts[accounts.length - 1]
+  return preferred?.access_token ?? fallback?.access_token ?? null
+}
+
 /**
  * Gets the authenticated user's GitHub token
  * Returns userId and token or an error Response
@@ -213,10 +236,7 @@ export async function requireGitHubAuth(): Promise<GitHubAuthResult | Response> 
     return unauthorized()
   }
 
-  const account = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "github" },
-  })
-  const token = account?.access_token
+  const token = await getPreferredGitHubToken(session.user.id)
 
   if (!token) {
     return Response.json({ error: "GitHub account not linked" }, { status: 401 })
@@ -237,10 +257,7 @@ export function isGitHubAuthError(result: GitHubAuthResult | Response): result i
  * Returns null if no GitHub account is linked
  */
 export async function getGitHubTokenForUser(userId: string): Promise<string | null> {
-  const account = await prisma.account.findFirst({
-    where: { userId, provider: "github" },
-  })
-  return account?.access_token ?? null
+  return getPreferredGitHubToken(userId)
 }
 
 // =============================================================================

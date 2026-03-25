@@ -12,6 +12,9 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           scope: "repo read:user",
+          // Force GitHub to show the authorization step again.
+          // This helps recover when a user revoked the app access and the stored token is now invalid.
+          prompt: "consent",
         },
       },
     }),
@@ -22,17 +25,24 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub
 
         // Fetch GitHub access token and login from database
-        const [account, user] = await Promise.all([
-          prisma.account.findFirst({
+        const [accounts, user] = await Promise.all([
+          prisma.account.findMany({
             where: { userId: token.sub, provider: "github" },
+            select: { access_token: true, providerAccountId: true, id: true },
+            orderBy: { id: "asc" },
           }),
           prisma.user.findUnique({
             where: { id: token.sub },
-            select: { githubLogin: true },
+            select: { githubLogin: true, githubId: true },
           }),
         ])
-        if (account?.access_token) {
-          session.accessToken = account.access_token
+        const preferred = user?.githubId
+          ? accounts.find((account) => account.providerAccountId === user.githubId)
+          : undefined
+        const fallback = accounts[accounts.length - 1]
+        const accessToken = preferred?.access_token ?? fallback?.access_token
+        if (accessToken) {
+          session.accessToken = accessToken
         }
         if (user?.githubLogin) {
           session.user.githubLogin = user.githubLogin
@@ -48,10 +58,32 @@ export const authOptions: NextAuthOptions = {
       // On sign in, store GitHub-specific info
       if (account?.provider === "github" && profile) {
         const githubProfile = profile as { id: number; login: string }
+        const providerAccountId = String(githubProfile.id)
+
+        // Ensure the newest OAuth tokens are persisted after re-consent.
+        // Without this, a previously revoked token can keep being used.
+        await prisma.account.updateMany({
+          where: {
+            userId: token.sub,
+            provider: "github",
+            providerAccountId,
+          },
+          data: {
+            access_token: account.access_token ?? null,
+            refresh_token: account.refresh_token ?? null,
+            expires_at: account.expires_at ?? null,
+            token_type: account.token_type ?? null,
+            scope: account.scope ?? null,
+            id_token: account.id_token ?? null,
+          },
+        }).catch(() => {
+          // Account row may not exist yet during first sign-in creation.
+        })
+
         await prisma.user.update({
           where: { id: token.sub },
           data: {
-            githubId: String(githubProfile.id),
+            githubId: providerAccountId,
             githubLogin: githubProfile.login,
           },
         }).catch(() => {

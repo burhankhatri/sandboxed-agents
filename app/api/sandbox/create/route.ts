@@ -10,6 +10,7 @@ import {
   badRequest,
   unauthorized,
   decryptUserCredentials,
+  getGitHubTokenForUser,
 } from "@/lib/api-helpers"
 import { createSSEStream, sendProgress, sendError, sendDone } from "@/lib/streaming-helpers"
 import { SANDBOX_CONFIG, PATHS } from "@/lib/constants"
@@ -54,10 +55,7 @@ export async function POST(req: Request) {
   if (isDaytonaKeyError(daytonaApiKey)) return daytonaApiKey
 
   // Get GitHub token from NextAuth
-  const account = await prisma.account.findFirst({
-    where: { userId, provider: "github" },
-  })
-  const githubToken = account?.access_token
+  const githubToken = await getGitHubTokenForUser(userId)
   if (!githubToken) {
     return unauthorized()
   }

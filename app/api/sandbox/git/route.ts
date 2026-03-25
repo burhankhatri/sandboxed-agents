@@ -9,6 +9,7 @@ import {
   getDaytonaApiKey,
   isDaytonaKeyError,
   internalError,
+  getGitHubTokenForUser,
 } from "@/lib/api-helpers"
 import { generateCommitMessage } from "@/lib/commit-message"
 // Git operation timeout - 60 seconds (must be literal for Next.js static analysis)
@@ -97,10 +98,7 @@ export async function POST(req: Request) {
   if (isDaytonaKeyError(daytonaApiKey)) return daytonaApiKey
 
   // Get GitHub token from NextAuth
-  const account = await prisma.account.findFirst({
-    where: { userId: auth.userId, provider: "github" },
-  })
-  const githubToken = account?.access_token
+  const githubToken = await getGitHubTokenForUser(auth.userId)
 
   try {
     const sandbox = await ensureSandboxStarted(daytonaApiKey, sandboxId)

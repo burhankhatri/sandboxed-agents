@@ -29,3 +29,6 @@ Authentication is bypassed. DO NOT use in production!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
  GET /api/github/repos 500 in 579ms (compile: 536ms, render: 43ms)
+○ Compiling / ...
+ GET / 200 in 4.0s (compile: 3.8s, render: 163ms)
+ GET / 200 in 42ms (compile: 4ms, render: 38ms)

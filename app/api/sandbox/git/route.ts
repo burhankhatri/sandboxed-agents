@@ -297,6 +297,47 @@ export async function POST(req: Request) {
         if (!githubToken || !targetBranch || !currentBranch) {
           return badRequest("Missing required fields for merge")
         }
+
+        // If squash merge is requested, use GitHub API
+        if (squash) {
+          if (!repoOwner || !repoApiName) {
+            return badRequest("Missing repo info for squash merge")
+          }
+          // Use GitHub's merge API with squash method
+          const mergeRes = await fetch(
+            `https://api.github.com/repos/${repoOwner}/${repoApiName}/merges`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${githubToken}`,
+                Accept: "application/vnd.github.v3+json",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                base: targetBranch,
+                head: currentBranch,
+                commit_message: `Squash merge ${currentBranch} into ${targetBranch}`,
+              }),
+            }
+          )
+          if (!mergeRes.ok) {
+            const mergeData = await mergeRes.json().catch(() => ({}))
+            const errorMessage = (mergeData as { message?: string }).message || `Status ${mergeRes.status}`
+            if (mergeRes.status === 409) {
+              return Response.json({ error: "Merge conflict: " + errorMessage }, { status: 409 })
+            }
+            return Response.json({ error: "Merge failed: " + errorMessage }, { status: 500 })
+          }
+          // Pull the changes into the sandbox to sync local state
+          try {
+            await sandbox.git.pull(repoPath, "x-access-token", githubToken)
+          } catch {
+            // May fail but GitHub merge succeeded
+          }
+          return Response.json({ success: true })
+        }
+
+        // Regular merge: use sandbox git operations
         // Use SDK to checkout target branch (safer than git command)
         try {
           await sandbox.git.checkoutBranch(repoPath, targetBranch)
@@ -314,26 +355,15 @@ export async function POST(req: Request) {
         } catch {
           // May fail if target is already up to date or doesn't have upstream
         }
-        // Merge current branch into target (with optional squash)
-        const mergeCmd = squash
-          ? `cd ${repoPath} && git merge --squash ${currentBranch} 2>&1`
-          : `cd ${repoPath} && git merge ${currentBranch} --no-edit 2>&1`
-        const mergeResult = await sandbox.process.executeCommand(mergeCmd)
+        // Merge current branch into target
+        const mergeResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git merge ${currentBranch} --no-edit 2>&1`
+        )
         if (mergeResult.exitCode) {
           // Abort the merge on conflict
           await sandbox.process.executeCommand(`cd ${repoPath} && git merge --abort 2>&1`)
           await sandbox.git.checkoutBranch(repoPath, currentBranch)
           return Response.json({ error: "Merge conflict: " + mergeResult.result }, { status: 409 })
-        }
-        // If squash merge, we need to commit the squashed changes
-        if (squash) {
-          const commitResult = await sandbox.process.executeCommand(
-            `cd ${repoPath} && git commit -m 'Squash merge ${currentBranch} into ${targetBranch}' 2>&1`
-          )
-          if (commitResult.exitCode) {
-            await sandbox.git.checkoutBranch(repoPath, currentBranch)
-            return Response.json({ error: "Squash commit failed: " + commitResult.result }, { status: 500 })
-          }
         }
         // Double-check we're on target branch before pushing
         const mergeVerifyStatus = await sandbox.git.status(repoPath)

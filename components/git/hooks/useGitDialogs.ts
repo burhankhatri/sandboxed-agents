@@ -121,6 +121,8 @@ export function useGitDialogs({
           targetBranch: targetBranch,
           currentBranch: sourceBranch,
           squash: squashMerge,
+          repoOwner: repoOwner,
+          repoApiName: repoName,
         }),
       })
       const data = await res.json()
@@ -133,7 +135,7 @@ export function useGitDialogs({
     } finally {
       setActionLoading(false)
     }
-  }, [selectedBranch, branch, sandboxId, branchName, repoName, addSystemMessage, mergeDirection, squashMerge])
+  }, [selectedBranch, branch, sandboxId, branchName, repoName, repoOwner, addSystemMessage, mergeDirection, squashMerge])
 
   const handleRebase = useCallback(async () => {
     if (!selectedBranch || !branch || !sandboxId) return

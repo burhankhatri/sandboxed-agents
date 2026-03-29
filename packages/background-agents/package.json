@@ -1,0 +1,57 @@
+{
+  "name": "background-agents",
+  "version": "0.1.2",
+  "description": "A TypeScript SDK for interacting with various AI coding agents (Claude, Codex, OpenCode, Gemini)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "coding-agent",
+    "claude",
+    "codex",
+    "opencode",
+    "gemini",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ssh2": "^1.15.5",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "next.config.codeagentsdk.cjs"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./next.config": "./next.config.codeagentsdk.cjs"
+  },
+  "dependencies": {
+    "@daytonaio/sdk": "^0.150.0",
+    "dotenv": "^17.3.1",
+    "ssh2": "^1.17.0"
+  }
+}

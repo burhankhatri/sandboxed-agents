@@ -64,6 +64,11 @@ export function useExecutionPolling({
   const activeBranchIdRef = useRef(branch.id)
   activeBranchIdRef.current = branch.id
 
+  // Track the current branch name (updated on every render)
+  // This is used for branch validation during push - we need fresh state, not stale polling refs
+  const currentBranchNameRef = useRef(branch.name)
+  currentBranchNameRef.current = branch.name
+
   // Loop mode refs - track loop state without recreating callbacks
   const loopEnabledRef = useRef(branch.loopEnabled)
   const loopCountRef = useRef(branch.loopCount || 0)
@@ -84,8 +89,9 @@ export function useExecutionPolling({
     commitDetectionRunningRef.current = true
 
     // Use the branch context captured at polling start, not the currently viewed branch
+    // EXCEPT for branch name - use fresh state to avoid race condition with auto-rename
     const currentSandboxId = pollingBranchSandboxIdRef.current
-    const currentBranchName = pollingBranchNameRef.current
+    const currentBranchName = currentBranchNameRef.current
     const targetBranchId = pollingBranchIdRef.current
 
     if (!currentSandboxId || !targetBranchId) {

@@ -1,9 +1,3 @@
-import path from "path"
-import { fileURLToPath } from "url"
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const sdkPath = path.join(__dirname, "node_modules/background-agents")
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
@@ -18,14 +12,9 @@ const nextConfig = {
     "cpu-features",
     "background-agents",
   ],
-  turbopack: {
-    resolveAlias: {
-      "background-agents": "./node_modules/background-agents",
-    },
-  },
+  // Empty turbopack config to acknowledge we're using webpack
+  turbopack: {},
   webpack: (config, { isServer }) => {
-    config.resolve.alias["background-agents"] = sdkPath
-
     // Exclude .node files from webpack bundling entirely
     config.module.noParse = /\.node$/
 

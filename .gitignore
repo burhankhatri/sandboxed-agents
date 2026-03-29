@@ -1,18 +1,26 @@
-# v0 runtime files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-
-# Common ignores
+# Dependencies
 node_modules/
-.next/
+
+# Build outputs
+packages/*/dist/
+packages/web/.next/
+
+# Environment
 .env
 .env*.local
-.env
+
+# Generated
+packages/web/lib/generated/prisma
+
+# IDE
 .DS_Store
-/lib/generated/prisma
+*.log
 
 # Build artifacts
 tsconfig.tsbuildinfo
 next-env.d.ts
-*.log
+
+# v0 runtime files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts

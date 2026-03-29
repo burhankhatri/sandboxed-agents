@@ -24,6 +24,21 @@ Add dark mode toggle to settings page
 Fix authentication timeout on slow connections
 Refactor API client for better error handling`
 
+const PR_BODY_PROMPT = `Based on the commit messages below, generate a clear and helpful pull request description.
+
+Requirements:
+- Start with a brief summary (1-2 sentences) of what this PR accomplishes
+- Include a "## Changes" section with bullet points summarizing the key changes
+- Keep it concise but informative
+- Use markdown formatting
+- Do not include a title or PR number
+- Do not make up details not evident from the commits
+
+Commit messages:
+{commits}
+
+Reply with ONLY the PR description in markdown format.`
+
 /**
  * Generate a PR title using AI, with fallback to simple branch name formatting
  */
@@ -70,6 +85,44 @@ async function generatePRTitle(
   }
 }
 
+/**
+ * Generate a PR body/description using AI, with fallback to simple commit list
+ */
+async function generatePRBody(
+  userId: string,
+  commits: string[]
+): Promise<string> {
+  // Always have a fallback body from commit messages
+  const fallbackBody = commits.length > 0
+    ? commits.map((c) => `- ${c}`).join("\n")
+    : "Automated PR"
+
+  // If no commits, just use fallback
+  if (commits.length === 0) {
+    return fallbackBody
+  }
+
+  const prompt = PR_BODY_PROMPT
+    .replace("{commits}", commits.map((c) => `- ${c}`).join("\n"))
+
+  try {
+    const result = await generateWithUserLLM({ userId, prompt })
+
+    if (result.error || !result.text) {
+      console.log("[generatePRBody] AI generation failed, using fallback:", result.error)
+      return fallbackBody
+    }
+
+    // Basic sanitization - trim and ensure it's not empty
+    const sanitizedBody = result.text.trim()
+
+    return sanitizedBody || fallbackBody
+  } catch (error) {
+    console.error("[generatePRBody] Error:", error)
+    return fallbackBody
+  }
+}
+
 export async function POST(req: Request) {
   const auth = await requireGitHubAuth()
   if (isGitHubAuthError(auth)) return auth
@@ -84,23 +137,23 @@ export async function POST(req: Request) {
 
   try {
     // Get commits between base and head for PR body and title generation
-    let prBody = ""
     let commitMessages: string[] = []
     try {
       const compareData = await compareBranches(auth.token, owner, repo, base, head)
       const commits = compareData.commits || []
       if (commits.length > 0) {
         commitMessages = commits.map((c) => c.commit.message)
-        prBody = commits
-          .map((c) => `- ${c.commit.message}`)
-          .join("\n")
       }
     } catch {
-      // Ignore compare errors, just use empty body
+      // Ignore compare errors, just use empty commits
     }
 
-    // Generate AI-powered PR title (falls back to branch name formatting)
-    const title = await generatePRTitle(auth.userId, head, commitMessages)
+    // Generate AI-powered PR title and body (falls back to simple formatting)
+    // Run both in parallel for better performance
+    const [title, prBody] = await Promise.all([
+      generatePRTitle(auth.userId, head, commitMessages),
+      generatePRBody(auth.userId, commitMessages),
+    ])
 
     // Create the PR
     const prData = await createPullRequest(auth.token, owner, repo, {

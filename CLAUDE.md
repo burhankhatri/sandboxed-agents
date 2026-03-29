@@ -1,8 +1,11 @@
 # Claude Instructions
 
-## Development
+## Before Starting the Development Server
 
-For development server instructions, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+**You MUST read [DEVELOPMENT.md](./DEVELOPMENT.md) first** to understand:
+- Prerequisites (PostgreSQL must be running, environment variables configured)
+- The full setup sequence (install deps → push DB schema → start server)
+- Troubleshooting steps if something fails
 
 ## Daytona Sandbox Environment
 

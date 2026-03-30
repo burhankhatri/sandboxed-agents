@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import type { Branch, Message } from "@/lib/shared/types"
+import type { Branch, Message, PushErrorInfo } from "@/lib/shared/types"
 import { generateId } from "@/lib/shared/store"
 import { PATHS } from "@/lib/shared/constants"
 
@@ -205,7 +205,38 @@ export function useGitDialogs({
         return
       }
 
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) {
+        const errMsg =
+          typeof data.error === "string"
+            ? data.error
+            : `Request failed (${res.status})`
+        // Rebase succeeded locally but GitHub ref update failed — same situation as auto-commit push;
+        // offer delete-remote-branch + push retry (MessageBubble PushErrorRetry).
+        if (errMsg.includes("Force push failed") && branchId) {
+          const pushError: PushErrorInfo = {
+            errorMessage: errMsg,
+            branchName,
+            sandboxId,
+            repoPath: `${PATHS.SANDBOX_HOME}/${repoName}`,
+            repoOwner: apiOwner,
+            repoApiName: apiRepo,
+          }
+          await onAddMessage(branchId, {
+            id: generateId(),
+            role: "assistant",
+            content:
+              `⚠️ **Rebase finished locally** but the remote branch could not be updated.\n\n${errMsg}`,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            pushError,
+          })
+          setRebaseOpen(false)
+          return
+        }
+        throw new Error(errMsg)
+      }
       addSystemMessage(`Rebased **${branchName}** onto **${selectedBranch}** and force-pushed.`)
       setRebaseOpen(false)
     } catch (err: unknown) {
@@ -214,7 +245,7 @@ export function useGitDialogs({
     } finally {
       setActionLoading(false)
     }
-  }, [selectedBranch, branch, sandboxId, branchName, repoOwner, repoName, repoFullName, addSystemMessage])
+  }, [selectedBranch, branch, sandboxId, branchName, branchId, repoOwner, repoName, repoFullName, addSystemMessage, onAddMessage])
 
   const handleTag = useCallback(async () => {
     const name = tagNameInput.trim()

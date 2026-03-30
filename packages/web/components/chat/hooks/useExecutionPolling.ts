@@ -17,7 +17,10 @@ import {
   getExistingCommitHashes,
   filterNewCommits,
 } from "@/lib/core/git"
-import { upsertPushErrorSystemMessage } from "@/lib/chat/upsert-push-error-message"
+import {
+  upsertPushErrorSystemMessage,
+  clearPushErrorMessages,
+} from "@/lib/chat/upsert-push-error-message"
 import type { ToolCall, ContentBlock } from "@/lib/shared/types"
 
 interface UseExecutionPollingOptions {
@@ -188,6 +191,12 @@ export function useExecutionPolling({
                 }
               )
             }
+          } else {
+            await clearPushErrorMessages(
+              targetBranchId,
+              pollingBranchMessagesRef.current,
+              onUpdateMessage
+            )
           }
         }
       }
@@ -283,6 +292,8 @@ export function useExecutionPolling({
     pollingLastShownCommitHashRef.current = branch.lastShownCommitHash || null
     // Reset commit detection guard for new execution
     commitDetectionRunningRef.current = false
+
+    void clearPushErrorMessages(branch.id, branch.messages, onUpdateMessage)
 
     if (streamingMessageIdRef) {
       streamingMessageIdRef.current = messageId

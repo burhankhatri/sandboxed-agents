@@ -40,3 +40,17 @@ export async function upsertPushErrorSystemMessage(
     opts.onUpdateMessage(branchId, last.id, { content, pushError, timestamp })
   )
 }
+
+/** Removes push-error retry UI from all messages (e.g. after a successful push or when an agent run starts). */
+export async function clearPushErrorMessages(
+  branchId: string,
+  messages: Message[],
+  onUpdateMessage: (branchId: string, messageId: string, updates: Partial<Message>) => void | Promise<void>
+): Promise<void> {
+  for (const m of messages) {
+    if (m.pushError == null) continue
+    await Promise.resolve(
+      onUpdateMessage(branchId, m.id, { pushError: undefined, content: "" })
+    )
+  }
+}

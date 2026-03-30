@@ -635,39 +635,85 @@ export async function POST(req: Request) {
         return Response.json({ success: true })
       }
 
-      case "delete-branch-and-push": {
-        // Delete the remote branch via GitHub API, then push from sandbox via Daytona SDK
-        // This is used when a push fails and the user wants to delete the remote and retry
+      case "force-push": {
+        // Force-push to sync diverged history while preserving PRs
+        // Strategy: create temp branch, push via Daytona SDK to get commits on GitHub,
+        // then use GitHub API to force-update the real branch ref.
         if (!currentBranch || !githubToken || !repoOwner || !repoApiName) {
-          return badRequest("Missing required fields for delete-branch-and-push")
+          return badRequest("Missing required fields for force-push")
         }
 
-        // Step 1: Delete the remote branch via GitHub API
-        const deleteBranchRes = await fetch(
+        // Get local HEAD SHA
+        const shaResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git rev-parse HEAD 2>&1`
+        )
+        if (shaResult.exitCode !== 0) {
+          return Response.json({ error: "Failed to get HEAD: " + shaResult.result }, { status: 500 })
+        }
+        const sha = shaResult.result.trim()
+
+        // Step 1: Create and checkout a temp branch at current HEAD
+        const tempBranch = `_cleanup/force-push-${Date.now()}`
+        const createBranchResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git checkout -b ${tempBranch} 2>&1`
+        )
+        if (createBranchResult.exitCode !== 0) {
+          return Response.json({ error: "Failed to create temp branch: " + createBranchResult.result }, { status: 500 })
+        }
+
+        // Step 2: Push temp branch via Daytona SDK (uploads commits to GitHub)
+        try {
+          await sandbox.git.push(repoPath, "x-access-token", githubToken)
+        } catch (pushErr) {
+          // Restore original branch before returning error
+          await sandbox.process.executeCommand(`cd ${repoPath} && git checkout ${currentBranch} 2>&1`)
+          await sandbox.process.executeCommand(`cd ${repoPath} && git branch -D ${tempBranch} 2>&1`)
+          return Response.json({
+            error: "Failed to push temp branch: " + (pushErr instanceof Error ? pushErr.message : String(pushErr))
+          }, { status: 500 })
+        }
+
+        // Step 3: Checkout original branch and delete temp local branch
+        await sandbox.process.executeCommand(`cd ${repoPath} && git checkout ${currentBranch} 2>&1`)
+        await sandbox.process.executeCommand(`cd ${repoPath} && git branch -D ${tempBranch} 2>&1`)
+
+        // Step 4: Use GitHub API to force-update the real branch ref to the new SHA
+        const refRes = await fetch(
           `https://api.github.com/repos/${repoOwner}/${repoApiName}/git/refs/heads/${currentBranch}`,
           {
-            method: "DELETE",
+            method: "PATCH",
             headers: {
               Authorization: `Bearer ${githubToken}`,
               Accept: "application/vnd.github.v3+json",
             },
+            body: JSON.stringify({ sha, force: true }),
           }
         )
-        // 404 is fine - branch might not exist on remote
-        if (!deleteBranchRes.ok && deleteBranchRes.status !== 404) {
-          const deleteErrData = await deleteBranchRes.json().catch(() => ({}))
+
+        // Step 5: Delete the temp remote branch (retry up to 3 times)
+        for (let i = 0; i < 3; i++) {
+          const deleteRes = await fetch(
+            `https://api.github.com/repos/${repoOwner}/${repoApiName}/git/refs/heads/${tempBranch}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${githubToken}`,
+                Accept: "application/vnd.github.v3+json",
+              },
+            }
+          )
+          if (deleteRes.ok || deleteRes.status === 404) break
+          if (i < 2) await new Promise(r => setTimeout(r, 500 * (i + 1)))
+        }
+
+        if (!refRes.ok) {
+          const refData = await refRes.json().catch(() => ({}))
           return Response.json({
-            error: "Failed to delete remote branch: " + ((deleteErrData as { message?: string }).message || deleteBranchRes.status)
+            error: "Force push failed: " + ((refData as { message?: string }).message || refRes.status)
           }, { status: 500 })
         }
 
-        // Step 2: Push from sandbox using Daytona SDK
-        const retryPushResult = await pushWithRetry(sandbox, repoPath, githubToken, currentBranch)
-        if (!retryPushResult.success) {
-          return Response.json({ error: "Push failed after branch deletion: " + retryPushResult.error }, { status: 500 })
-        }
-
-        return Response.json({ success: true, deleted: deleteBranchRes.status !== 404 })
+        return Response.json({ success: true })
       }
 
       case "rename-branch": {

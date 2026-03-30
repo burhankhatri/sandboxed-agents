@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/shared/utils"
-import type { Agent, Message, PushErrorInfo, ToolCall } from "@/lib/shared/types"
+import type { Agent, AssistantSource, Message, PushErrorInfo, ToolCall } from "@/lib/shared/types"
+import { ASSISTANT_SOURCE } from "@/lib/shared/constants"
 import { agentLabels } from "@/lib/shared/types"
 import {
   FileText,
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   Loader2,
   Trash2,
+  LayoutDashboard,
 } from "lucide-react"
 import { AgentIcon } from "@/components/icons/agent-icons"
 import Markdown from "react-markdown"
@@ -204,10 +206,18 @@ interface MessageBubbleProps {
   onClearPushError?: (messageId: string) => void
 }
 
+function effectiveAssistantSource(message: Message): AssistantSource {
+  if (message.role !== "assistant") return ASSISTANT_SOURCE.MODEL
+  if (message.commitHash) return ASSISTANT_SOURCE.COMMIT
+  return message.assistantSource ?? ASSISTANT_SOURCE.MODEL
+}
+
 export function MessageBubble({ message, agent = "claude-code", agentLabel, onCommitClick, onBranchFromCommit, onRetryPush, onClearPushError }: MessageBubbleProps) {
   // Use agent prop primarily, fall back to agentLabel for backwards compatibility
   const displayLabel = agentLabel || agentLabels[agent] || "Claude Code"
   const isUser = message.role === "user"
+  const source = effectiveAssistantSource(message)
+  const isSystemAssistant = !isUser && source === ASSISTANT_SOURCE.SYSTEM
 
   // Commit row rendering
   if (message.commitHash) {
@@ -238,6 +248,38 @@ export function MessageBubble({ message, agent = "claude-code", agentLabel, onCo
   }
 
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
+
+  if (isSystemAssistant) {
+    return (
+      <div
+        className="flex flex-col min-w-0 max-w-full"
+        aria-label="Workspace message"
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
+            <LayoutDashboard className="h-3 w-3" />
+          </div>
+          <span className="text-[11px] font-medium text-muted-foreground">Workspace</span>
+          <span className="text-[10px] text-muted-foreground/40">{message.timestamp}</span>
+        </div>
+        <div className="border-l-2 border-muted-foreground/25 pl-3 ml-0.5 rounded-r-md bg-muted/40 py-2 pr-3 text-sm text-foreground/90">
+          {message.content ? (
+            <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {message.content}
+            </Markdown>
+          ) : null}
+        </div>
+        {message.pushError && onRetryPush && (
+          <PushErrorRetry
+            pushError={message.pushError}
+            onRetry={onRetryPush}
+            messageId={message.id}
+            onClearError={() => onClearPushError?.(message.id)}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col min-w-0 max-w-full">
@@ -292,7 +334,8 @@ export function MessageBubble({ message, agent = "claude-code", agentLabel, onCo
                 >{message.content}</Markdown>
               )
             ) : (
-              message.role === "assistant" && (
+              message.role === "assistant" &&
+              source === ASSISTANT_SOURCE.MODEL && (
                 <span className="text-muted-foreground/50 italic">Thinking...</span>
               )
             )}

@@ -4,7 +4,7 @@ import { cn } from "@/lib/shared/utils"
 import type { Agent, Branch, Message, PushErrorInfo, UserCredentialFlags } from "@/lib/shared/types"
 import { defaultAgentModel, getDefaultModelForAgent, LOOP_CONTINUATION_MESSAGE, DEFAULT_LOOP_MAX_ITERATIONS } from "@/lib/shared/types"
 import { generateId } from "@/lib/shared/store"
-import { BRANCH_STATUS, PATHS } from "@/lib/shared/constants"
+import { ASSISTANT_SOURCE, BRANCH_STATUS, PATHS } from "@/lib/shared/constants"
 import { waitForSSEResult } from "@/lib/shared/sse-utils"
 import { Terminal } from "lucide-react"
 import { useRef, useEffect, useCallback, useState } from "react"
@@ -158,6 +158,7 @@ export function ChatPanel({
     const assistantMsg: Message = {
       id: generateId(),
       role: "assistant",
+      assistantSource: ASSISTANT_SOURCE.MODEL,
       content: "",
       toolCalls: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -327,6 +328,7 @@ export function ChatPanel({
     const assistantMsg: Message = {
       id: generateId(),
       role: "assistant",
+      assistantSource: ASSISTANT_SOURCE.MODEL,
       content: "",
       toolCalls: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),

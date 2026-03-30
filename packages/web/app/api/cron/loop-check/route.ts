@@ -155,6 +155,7 @@ export async function GET(req: Request) {
             branchId: branch.id,
             role: "assistant",
             content: "",
+            assistantSource: "model",
           },
         })
 

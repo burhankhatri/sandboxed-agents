@@ -57,6 +57,7 @@ export async function GET(req: Request) {
         timestamp: true,
         commitHash: true,
         commitMessage: true,
+        assistantSource: true,
       },
     }),
   })
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
     commitHash,
     commitMessage,
     pushError,
+    assistantSource: assistantSourceBody,
   } = body
 
   if (!branchId || !role) {
@@ -106,6 +108,21 @@ export async function POST(req: Request) {
     return notFound("Branch not found")
   }
 
+  let assistantSource: string | null = null
+  if (role === "assistant") {
+    if (
+      assistantSourceBody === "model" ||
+      assistantSourceBody === "system" ||
+      assistantSourceBody === "commit"
+    ) {
+      assistantSource = assistantSourceBody
+    } else if (commitHash) {
+      assistantSource = "commit"
+    } else {
+      assistantSource = "model"
+    }
+  }
+
   const message = await prisma.message.create({
     data: {
       branchId,
@@ -116,6 +133,7 @@ export async function POST(req: Request) {
       timestamp,
       commitHash,
       commitMessage,
+      ...(assistantSource != null && { assistantSource }),
       ...(pushError !== undefined && pushError !== null && { pushError }),
     },
   })

@@ -3,7 +3,7 @@
  * These are the "raw" shapes before transformation to frontend types
  */
 
-import type { Message, Branch } from "@/lib/shared/types"
+import type { AssistantSource, Message, Branch } from "@/lib/shared/types"
 
 export interface DbSandbox {
   id: string
@@ -23,6 +23,7 @@ export interface DbMessage {
   timestamp: string | null
   commitHash: string | null
   commitMessage: string | null
+  assistantSource?: string | null
   pushError?: unknown
 }
 
@@ -37,6 +38,7 @@ export interface DbMessageSummary {
   timestamp: string | null
   commitHash: string | null
   commitMessage: string | null
+  assistantSource?: string | null
 }
 
 export interface DbBranch {
@@ -88,10 +90,19 @@ export interface UserCredentials {
   loopUntilFinishedEnabled?: boolean
 }
 
+function resolveAssistantSource(m: DbMessage): AssistantSource | undefined {
+  if (m.role !== "assistant") return undefined
+  const raw = m.assistantSource
+  if (raw === "system" || raw === "commit" || raw === "model") return raw
+  if (m.commitHash) return "commit"
+  return "model"
+}
+
 /**
  * Transform a database message to frontend format
  */
 export function transformMessage(m: DbMessage): Message {
+  const assistantSource = resolveAssistantSource(m)
   return {
     id: m.id,
     role: m.role as "user" | "assistant",
@@ -104,6 +115,7 @@ export function transformMessage(m: DbMessage): Message {
     ...(m.pushError != null && {
       pushError: m.pushError as Message["pushError"],
     }),
+    ...(assistantSource != null && { assistantSource }),
   }
 }
 
@@ -112,6 +124,14 @@ export function transformMessage(m: DbMessage): Message {
  * Sets contentLoaded=false to indicate full content needs to be fetched
  */
 export function transformMessageSummary(m: DbMessageSummary): Message {
+  const assistantSource =
+    m.role === "assistant"
+      ? m.assistantSource === "system" || m.assistantSource === "commit" || m.assistantSource === "model"
+        ? m.assistantSource
+        : m.commitHash
+          ? ("commit" as const)
+          : ("model" as const)
+      : undefined
   return {
     id: m.id,
     role: m.role as "user" | "assistant",
@@ -120,6 +140,7 @@ export function transformMessageSummary(m: DbMessageSummary): Message {
     commitHash: m.commitHash || undefined,
     commitMessage: m.commitMessage || undefined,
     contentLoaded: false, // Flag to indicate content needs lazy loading
+    ...(assistantSource != null && { assistantSource }),
   }
 }
 

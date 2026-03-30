@@ -57,6 +57,13 @@ export const MESSAGE_ROLE = {
 
 export type MessageRole = (typeof MESSAGE_ROLE)[keyof typeof MESSAGE_ROLE]
 
+/** Stored on Message when role is assistant — see `Message.assistantSource`. */
+export const ASSISTANT_SOURCE = {
+  MODEL: "model",
+  SYSTEM: "system",
+  COMMIT: "commit",
+} as const
+
 // =============================================================================
 // Content Block Types
 // =============================================================================

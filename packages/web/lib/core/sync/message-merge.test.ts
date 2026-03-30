@@ -53,6 +53,13 @@ describe('mergeMessages', () => {
     const result = mergeMessages(local, api)
     expect(result[0].pushError).toEqual(pushError)
   })
+
+  it('preserves assistantSource from API', () => {
+    const local: MessageLike[] = [{ id: '1', role: 'assistant', content: 'x' }]
+    const api: ApiMessage[] = [{ id: '1', role: 'assistant', content: 'x', assistantSource: 'system' }]
+    const result = mergeMessages(local, api)
+    expect(result[0].assistantSource).toBe('system')
+  })
 })
 
 describe('shouldSkipSync', () => {

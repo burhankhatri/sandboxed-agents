@@ -116,6 +116,10 @@ export function useBranchOperations({
           timestamp: message.timestamp,
           commitHash: message.commitHash,
           commitMessage: message.commitMessage,
+          ...(message.role === "assistant" && {
+            assistantSource:
+              message.assistantSource ?? (message.commitHash ? "commit" : "model"),
+          }),
           ...(message.pushError != null && { pushError: message.pushError }),
         }),
       })

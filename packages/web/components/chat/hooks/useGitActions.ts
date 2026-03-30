@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react"
 import type { Branch, Message } from "@/lib/shared/types"
 import { generateId } from "@/lib/shared/store"
-import { PATHS } from "@/lib/shared/constants"
+import { ASSISTANT_SOURCE, PATHS } from "@/lib/shared/constants"
 import { useGitDialogs } from "@/components/git/hooks/useGitDialogs"
 import { toggleSandbox, createPR } from "@/lib/git/git-actions"
 
@@ -57,6 +57,7 @@ export function useGitActions({
     onAddMessage(branch.id, {
       id: generateId(),
       role: "assistant",
+      assistantSource: ASSISTANT_SOURCE.SYSTEM,
       content,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     })

@@ -297,6 +297,15 @@ function mergeMessages(
     timestamp: m.timestamp || "",
     commitHash: m.commitHash || undefined,
     commitMessage: m.commitMessage || undefined,
+    ...(m.role === "assistant" && {
+      assistantSource: (
+        m.assistantSource === "system" || m.assistantSource === "commit" || m.assistantSource === "model"
+          ? m.assistantSource
+          : m.commitHash
+            ? "commit"
+            : "model"
+      ) as import("@/lib/shared/types").AssistantSource,
+    }),
     ...(m.pushError != null && {
       pushError: m.pushError as import("@/lib/shared/types").Message["pushError"],
     }),

@@ -30,6 +30,7 @@ export interface ApiMessage {
   timestamp?: string
   commitHash?: string | null
   commitMessage?: string | null
+  assistantSource?: string | null
 }
 
 // =============================================================================
@@ -77,6 +78,16 @@ export function isLocalRicher(
  * Converts an API message to the local message format.
  */
 export function convertApiMessage<T extends ApiMessage>(apiMessage: T): MessageLike {
+  const assistantSource =
+    apiMessage.role === "assistant"
+      ? apiMessage.assistantSource === "system" ||
+          apiMessage.assistantSource === "commit" ||
+          apiMessage.assistantSource === "model"
+        ? apiMessage.assistantSource
+        : apiMessage.commitHash
+          ? "commit"
+          : "model"
+      : undefined
   return {
     id: apiMessage.id,
     role: apiMessage.role as 'user' | 'assistant',
@@ -86,6 +97,7 @@ export function convertApiMessage<T extends ApiMessage>(apiMessage: T): MessageL
     timestamp: apiMessage.timestamp || '',
     commitHash: apiMessage.commitHash || undefined,
     commitMessage: apiMessage.commitMessage || undefined,
+    ...(assistantSource != null && { assistantSource }),
   }
 }
 

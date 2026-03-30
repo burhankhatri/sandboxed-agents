@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import type { Branch, Message, PushErrorInfo } from "@/lib/shared/types"
 import { generateId } from "@/lib/shared/store"
-import { PATHS } from "@/lib/shared/constants"
+import { ASSISTANT_SOURCE, PATHS } from "@/lib/shared/constants"
 
 // Export the return type for use in components
 export type UseGitDialogsReturn = ReturnType<typeof useGitDialogs>
@@ -68,6 +68,7 @@ export function useGitDialogs({
       id: generateId(),
       role: "assistant",
       content,
+      assistantSource: ASSISTANT_SOURCE.SYSTEM,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     })
   }, [branchId, onAddMessage])
@@ -224,6 +225,7 @@ export function useGitDialogs({
           await onAddMessage(branchId, {
             id: generateId(),
             role: "assistant",
+            assistantSource: ASSISTANT_SOURCE.SYSTEM,
             content:
               `⚠️ **Rebase finished locally** but the remote branch could not be updated.\n\n${errMsg}`,
             timestamp: new Date().toLocaleTimeString([], {

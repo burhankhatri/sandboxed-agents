@@ -134,6 +134,7 @@ export const messageCreateSchema = z.object({
   timestamp: z.string(),
   commitHash: optionalString,
   commitMessage: optionalString,
+  assistantSource: z.enum(["model", "system", "commit"]).optional(),
 })
 
 export const messageUpdateSchema = z.object({

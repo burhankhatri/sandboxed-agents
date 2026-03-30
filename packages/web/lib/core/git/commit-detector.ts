@@ -5,6 +5,8 @@
  * These functions have zero dependencies on React or browser APIs.
  */
 
+import { ASSISTANT_SOURCE } from "@/lib/shared/constants"
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -95,6 +97,7 @@ export function createCommitMessage(
   return {
     id: generateId(),
     role: 'assistant',
+    assistantSource: ASSISTANT_SOURCE.COMMIT,
     content: '',
     timestamp: new Date().toLocaleTimeString([], {
       hour: '2-digit',

@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from "react"
 import type { Branch, Message, PushErrorInfo } from "@/lib/shared/types"
 import { generateId } from "@/lib/shared/store"
-import { BRANCH_STATUS, EXECUTION_STATUS, PATHS } from "@/lib/shared/constants"
+import { ASSISTANT_SOURCE, BRANCH_STATUS, EXECUTION_STATUS, PATHS } from "@/lib/shared/constants"
 import { isLoopFinished, LOOP_CONTINUATION_MESSAGE } from "@/lib/shared/types"
 import {
   addToolCallIds,
@@ -144,6 +144,7 @@ export function useExecutionPolling({
           onAddMessage(targetBranchId, {
             id: generateId(),
             role: "assistant",
+            assistantSource: ASSISTANT_SOURCE.SYSTEM,
             content: `⚠️ **Push failed:** ${errorMessage}`,
             timestamp: new Date().toLocaleTimeString([], {
               hour: "2-digit",
@@ -187,6 +188,7 @@ export function useExecutionPolling({
           const commitMessage: Message = {
             id: generateId(),
             role: "assistant",
+            assistantSource: ASSISTANT_SOURCE.COMMIT,
             content: "",
             timestamp: new Date().toLocaleTimeString([], {
               hour: "2-digit",

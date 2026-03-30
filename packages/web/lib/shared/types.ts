@@ -262,6 +262,9 @@ export interface PushErrorInfo {
   repoApiName: string
 }
 
+/** Provenance for assistant rows (not user messages). */
+export type AssistantSource = "model" | "system" | "commit"
+
 export interface Message {
   id: string
   role: "user" | "assistant"
@@ -273,6 +276,8 @@ export interface Message {
   commitMessage?: string
   contentLoaded?: boolean  // false = summary only (content not loaded), true/undefined = full content available
   pushError?: PushErrorInfo  // Present when push failed, allows retry with branch deletion
+  /** Only for assistant: real model turn vs app/git vs commit chip. Omitted/undefined treated as model (except commit rows infer from commitHash). */
+  assistantSource?: AssistantSource
 }
 
 export interface Branch {

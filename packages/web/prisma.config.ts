@@ -12,7 +12,10 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   datasource: {
     url: addConnectionTimeout(
-      process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || ""
+      process.env.DATABASE_URL_UNPOOLED ||
+        process.env.DATABASE_URL ||
+        process.env.POSTGRES_URL ||
+        ""
     ),
   },
 })

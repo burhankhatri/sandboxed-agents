@@ -405,12 +405,12 @@ export async function POST(req: Request) {
           await sandbox.process.executeCommand(`cd ${repoPath} && git rebase --abort 2>&1`)
           return Response.json({ error: "Rebase failed: " + rebaseResult.result }, { status: 500 })
         }
-        // Get SHA for force push via GitHub API
+        // Move GitHub's branch ref to the new HEAD (non-fast-forward; same outcome as git push --force)
         const shaResult = await sandbox.process.executeCommand(
           `cd ${repoPath} && git rev-parse HEAD 2>&1`
         )
         const sha = shaResult.result.trim()
-        // Force push via GitHub API (PATCH refs)
+        // GitHub REST: update ref (objects must already exist on GitHub for this to succeed)
         const refRes = await fetch(
           `https://api.github.com/repos/${repoOwner}/${repoApiName}/git/refs/heads/${currentBranch}`,
           {

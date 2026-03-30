@@ -237,7 +237,9 @@ export function useGitDialogs({
         }
         throw new Error(errMsg)
       }
-      addSystemMessage(`Rebased **${branchName}** onto **${selectedBranch}** and force-pushed.`)
+      addSystemMessage(
+        `Rebased **${branchName}** onto **${selectedBranch}**. The branch on GitHub now points at your rebased commits.`
+      )
       setRebaseOpen(false)
     } catch (err: unknown) {
       addSystemMessage(`Rebase failed: ${err instanceof Error ? err.message : "Unknown error"}`)

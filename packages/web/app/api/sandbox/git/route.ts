@@ -636,39 +636,17 @@ export async function POST(req: Request) {
       }
 
       case "force-push": {
-        // Force-update the remote branch ref to match local HEAD
-        // This preserves PRs (unlike deleting the branch) while syncing diverged history
+        // Force-push to sync diverged history while preserving PRs
+        // Uses git push --force which uploads commits and updates the ref atomically
         if (!currentBranch || !githubToken || !repoOwner || !repoApiName) {
           return badRequest("Missing required fields for force-push")
         }
 
-        // Get local HEAD SHA
-        const shaResult = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git rev-parse HEAD 2>&1`
+        const pushResult = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git push --force https://x-access-token:${githubToken}@github.com/${repoOwner}/${repoApiName}.git HEAD:${currentBranch} 2>&1`
         )
-        if (shaResult.exitCode !== 0) {
-          return Response.json({ error: "Failed to get HEAD: " + shaResult.result }, { status: 500 })
-        }
-        const sha = shaResult.result.trim()
-
-        // Force-update the remote ref (preserves PRs, unlike delete + push)
-        const refRes = await fetch(
-          `https://api.github.com/repos/${repoOwner}/${repoApiName}/git/refs/heads/${currentBranch}`,
-          {
-            method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${githubToken}`,
-              Accept: "application/vnd.github.v3+json",
-            },
-            body: JSON.stringify({ sha, force: true }),
-          }
-        )
-
-        if (!refRes.ok) {
-          const refData = await refRes.json().catch(() => ({}))
-          return Response.json({
-            error: "Force push failed: " + ((refData as { message?: string }).message || refRes.status)
-          }, { status: 500 })
+        if (pushResult.exitCode !== 0) {
+          return Response.json({ error: "Force push failed: " + pushResult.result }, { status: 500 })
         }
 
         return Response.json({ success: true })

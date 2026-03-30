@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma"
+import { Daytona } from "@daytonaio/sdk"
 import {
   requireAuth,
   isAuthError,
@@ -8,11 +9,9 @@ import {
   getDaytonaApiKey,
   isDaytonaKeyError,
   getSandboxWithAuth,
-  decryptUserCredentials,
 } from "@/lib/shared/api-helpers"
 import { INCLUDE_EXECUTION_WITH_CONTEXT } from "@/lib/db/prisma-includes"
 import { PATHS, SNAPSHOT_POLL_THROTTLE_MS } from "@/lib/shared/constants"
-import { ensureSandboxReady } from "@/lib/sandbox/sandbox-resume"
 import { pollBackgroundAgent } from "@/lib/agents/agent-session"
 import { updateSnapshot } from "@/lib/agents/agent-events"
 import { persistExecutionCompletion } from "@/lib/agents/agent-events"
@@ -92,8 +91,6 @@ export async function POST(req: Request) {
       if (!isDaytonaKeyError(daytonaApiKey)) {
         const sandboxRecord = await getSandboxWithAuth(execution.sandboxId, auth.userId)
         if (sandboxRecord) {
-          const { anthropicApiKey, anthropicAuthToken, anthropicAuthType, openaiApiKey, opencodeApiKey } =
-            decryptUserCredentials(sandboxRecord.user.credentials)
           const actualRepoName = execution.message.branch.repo?.name ?? "repo"
           const repoPath = `${PATHS.SANDBOX_HOME}/${actualRepoName}`
           const backgroundSessionId = sandboxRecord.sessionId
@@ -102,24 +99,11 @@ export async function POST(req: Request) {
             try {
               const branch = execution.message.branch as { previewUrlPattern?: string | null; model?: string | null; agent?: string | null }
               const agent = branch.agent as Agent | undefined
-              // Use same canonical Daytona sandbox ID as execute (sandboxRecord.sandboxId) so we read the same meta.json
+              // Status polling should be read-mostly; avoid ensureSandboxReady here.
+              // We only need a sandbox handle to read background session events.
               const daytonaSandboxId = sandboxRecord.sandboxId
-              const { sandbox } = await ensureSandboxReady(
-                daytonaApiKey,
-                daytonaSandboxId,
-                actualRepoName,
-                branch.previewUrlPattern ?? sandboxRecord.previewUrlPattern ?? undefined,
-                anthropicApiKey,
-                anthropicAuthType,
-                anthropicAuthToken,
-                sandboxRecord.sessionId ?? undefined,
-                sandboxRecord.sessionAgent ?? undefined,
-                openaiApiKey,
-                agent,
-                branch.model ?? undefined,
-                opencodeApiKey,
-                execution.message.branch.repo?.id // Pass repoId for MCP config
-              )
+              const daytona = new Daytona({ apiKey: daytonaApiKey })
+              const sandbox = await daytona.get(daytonaSandboxId)
 
               const result = await pollBackgroundAgent(sandbox, backgroundSessionId, {
                 agentExecutionId: execution.id,

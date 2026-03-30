@@ -17,7 +17,6 @@ interface UseRepoOperationsOptions {
   activeRepo: TransformedRepo | null
   selectRepo: (repoId: string) => void
   setActiveBranchId: (branchId: string | null) => void
-  refresh: () => void
 }
 
 /**
@@ -30,7 +29,6 @@ export function useRepoOperations({
   activeRepo,
   selectRepo,
   setActiveBranchId,
-  refresh,
 }: UseRepoOperationsOptions) {
   // Add a new repo (persists to DB, then updates state and selection)
   const handleAddRepo = useCallback(
@@ -167,9 +165,9 @@ export function useRepoOperations({
       setActiveBranchId(remainingAfterDeletion[0]?.id ?? null)
     }
 
-    // Refresh data
-    refresh()
-  }, [activeRepo, setRepos, setActiveBranchId, refresh])
+    // Note: Don't call refresh() here - local state is already correct.
+    // Cross-device sync will handle eventual consistency if needed.
+  }, [activeRepo, setRepos, setActiveBranchId])
 
   return {
     handleAddRepo,

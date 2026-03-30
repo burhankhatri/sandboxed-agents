@@ -119,7 +119,6 @@ export default function Home() {
     activeRepo,
     selectRepo,
     setActiveBranchId,
-    refresh,
   })
 
   // Branch operations

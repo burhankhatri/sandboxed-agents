@@ -160,8 +160,12 @@ export function useExecutionPolling({
                 errorData.inMerge ||
                 errorMessage.includes("Merge in progress") ||
                 errorMessage.includes("Rebase in progress"))
+            // Benign: git had nothing to record — not a push failure worth surfacing
+            const isNothingToCommitNoise =
+              /nothing to commit/i.test(errorMessage) &&
+              /working tree clean/i.test(errorMessage)
 
-            if (!isConflictStateError) {
+            if (!isConflictStateError && !isNothingToCommitNoise) {
               const pushError: PushErrorInfo = {
                 errorMessage,
                 branchName: branch.name,

@@ -32,6 +32,11 @@ async function ensureCorrectBranch(
   return null
 }
 
+/** `git commit` exit 1 with nothing staged — not an error for auto-commit-push */
+function isGitNothingToCommitMessage(output: string): boolean {
+  return /nothing to commit/i.test(output)
+}
+
 /**
  * Push with retry logic.
  * Optionally verifies the current branch before each push attempt.
@@ -234,9 +239,13 @@ export async function POST(req: Request) {
             `cd ${repoPath} && git commit -m '${escapedMessage}' 2>&1`
           )
           if (commitResult.exitCode) {
-            return Response.json({ error: "Commit failed: " + commitResult.result }, { status: 500 })
+            if (!isGitNothingToCommitMessage(commitResult.result)) {
+              return Response.json({ error: "Commit failed: " + commitResult.result }, { status: 500 })
+            }
+            // Porcelain showed changes but nothing ended up staged (e.g. empty diff) — skip commit, still allow push
+          } else {
+            committed = true
           }
-          committed = true
         }
         // Check if there are unpushed commits by comparing local HEAD with remote
         // Use ls-remote since single-branch clones don't have origin/branchName refs

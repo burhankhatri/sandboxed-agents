@@ -33,6 +33,18 @@ interface UserMeResponse {
 }
 
 /**
+ * Response shape from /api/branches/messages
+ */
+interface BranchMessagesResponse<T = DbMessage> {
+  messages: T[]
+  pagination: {
+    totalCount: number
+    hasMore: boolean
+    nextCursor: string | null
+  }
+}
+
+/**
  * Fetch user data from /api/user/me
  */
 async function fetchUserMe(): Promise<UserMeResponse> {
@@ -42,13 +54,13 @@ async function fetchUserMe(): Promise<UserMeResponse> {
 /**
  * Fetch messages for a branch
  */
-async function fetchBranchMessages(branchId: string, summary: boolean = false) {
+async function fetchBranchMessages(branchId: string, summary: true): Promise<BranchMessagesResponse<DbMessageSummary>>
+async function fetchBranchMessages(branchId: string, summary?: false): Promise<BranchMessagesResponse<DbMessage>>
+async function fetchBranchMessages(branchId: string, summary: boolean = false): Promise<BranchMessagesResponse<DbMessage | DbMessageSummary>> {
   const url = summary
     ? `/api/branches/messages?branchId=${branchId}&summary=true`
     : `/api/branches/messages?branchId=${branchId}`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Failed to fetch messages: ${res.status}`)
-  return res.json()
+  return apiFetch<BranchMessagesResponse<DbMessage | DbMessageSummary>>(url)
 }
 
 interface UseRepoDataOptions {

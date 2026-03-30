@@ -214,10 +214,7 @@ export function MobileHeader({
 
   return (
     <header
-      className={cn(
-        "flex shrink-0 items-center gap-2 border-b bg-card px-2 py-2",
-        inConflict ? "border-red-500/50 bg-red-500/10" : "border-border"
-      )}
+      className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-2 py-2"
       style={{ paddingTop: 'calc(var(--safe-area-inset-top) + 0.5rem)' }}
     >
       {/* Hamburger menu button */}
@@ -350,7 +347,7 @@ export function MobileHeader({
         {/* Conflict indicator and abort button */}
         {inConflict && (
           <>
-            <div className="flex items-center gap-1 text-red-500 mr-1">
+            <div className="flex items-center gap-1 text-muted-foreground mr-1">
               <AlertTriangle className="h-3.5 w-3.5" />
               <span className="text-[10px] font-medium">Conflict</span>
             </div>

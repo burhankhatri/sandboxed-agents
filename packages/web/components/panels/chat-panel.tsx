@@ -597,7 +597,6 @@ export function ChatPanel({
           onBranchFromCommit={onBranchFromCommit}
           onRetryPush={handleRetryPush}
           onClearPushError={handleClearPushError}
-          inConflict={gitActions.gitDialogs.rebaseConflict?.inRebase}
         />
 
         {/* Input */}

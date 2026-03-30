@@ -16,7 +16,6 @@ import {
   Pause,
   Sparkles,
   XCircle,
-  AlertTriangle,
 } from "lucide-react"
 import type { RebaseConflictState } from "@/components/git/hooks/useGitDialogs"
 import {
@@ -67,10 +66,7 @@ export function ChatHeader({
   const inConflict = rebaseConflict?.inRebase ?? false
 
   return (
-    <header className={cn(
-      "flex shrink-0 items-center gap-2 border-b px-3 py-2.5 sm:px-4",
-      inConflict ? "border-red-500/50 bg-red-500/10" : "border-border"
-    )}>
+    <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5 sm:px-4">
       {/* Branch name section */}
       {renaming.renaming ? (
         <div className="flex items-center gap-1.5 min-w-0 ml-2.5">
@@ -212,7 +208,7 @@ export function ChatHeader({
                 Abort the rebase and return to the previous state
               </TooltipContent>
             </Tooltip>
-            <div className="mx-1.5 h-4 w-px bg-red-500/30 shrink-0" />
+            <div className="mx-1.5 h-4 w-px bg-border shrink-0" />
           </>
         )}
 

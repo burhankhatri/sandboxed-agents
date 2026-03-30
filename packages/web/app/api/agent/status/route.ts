@@ -17,6 +17,11 @@ import { updateSnapshot } from "@/lib/agents/agent-events"
 import { persistExecutionCompletion } from "@/lib/agents/agent-events"
 import type { Agent } from "@/lib/shared/types"
 
+// Serverless single-writer lease window for status-driven polling.
+// Only one request can claim heavy polling work for an execution during this window;
+// all other concurrent requests are read-only snapshot fetches.
+const STATUS_POLL_LEASE_MS = 5000
+
 function buildSnapshotResponse(
   execution: { status: string; message: { content?: string; toolCalls?: unknown[]; contentBlocks?: unknown[] } },
   snapshot: Record<string, unknown>
@@ -64,29 +69,22 @@ export async function POST(req: Request) {
     return unauthorized()
   }
 
-  // Status-driven polling (serverless): when execution is running, poll sandbox from this request
-  // so events reach the frontend even when the execute handler's background poller never runs.
-  // Use an atomic claim (update lastSnapshotPolledAt) so only one concurrent request does the heavy poll;
-  // others skip and refetch, avoiding duplicate logs and duplicate message updates.
-  const execWithPolledAt = execution as typeof execution & { lastSnapshotPolledAt?: Date | null }
+  // Status-driven polling (serverless): use DB lease claim so exactly one request
+  // per execution does heavy poll work; all others return read-only snapshots.
   if (execution.status === "running") {
-    const now = Date.now()
-    const lastPolled = execWithPolledAt.lastSnapshotPolledAt?.getTime() ?? 0
-    const shouldPoll = now - lastPolled >= SNAPSHOT_POLL_THROTTLE_MS
-
     let claimed = false
-    if (shouldPoll) {
-      const claimCutoff = new Date(now - SNAPSHOT_POLL_THROTTLE_MS)
-      const result = await prisma.$executeRaw`
-        UPDATE "AgentExecution"
-        SET "lastSnapshotPolledAt" = ${new Date()}
-        WHERE id = ${execution.id}
-          AND ("lastSnapshotPolledAt" IS NULL OR "lastSnapshotPolledAt" < ${claimCutoff})
-      `
-      claimed = Number(result) > 0
-    }
+    const now = Date.now()
+    const leaseWindowMs = Math.max(STATUS_POLL_LEASE_MS, SNAPSHOT_POLL_THROTTLE_MS)
+    const claimCutoff = new Date(now - leaseWindowMs)
+    const result = await prisma.$executeRaw`
+      UPDATE "AgentExecution"
+      SET "lastSnapshotPolledAt" = ${new Date()}
+      WHERE id = ${execution.id}
+        AND ("lastSnapshotPolledAt" IS NULL OR "lastSnapshotPolledAt" < ${claimCutoff})
+    `
+    claimed = Number(result) > 0
 
-    if (shouldPoll && claimed) {
+    if (claimed) {
       const daytonaApiKey = getDaytonaApiKey()
       if (!isDaytonaKeyError(daytonaApiKey)) {
         const sandboxRecord = await getSandboxWithAuth(execution.sandboxId, auth.userId)

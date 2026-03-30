@@ -159,13 +159,13 @@ export function useRepoData({ isAuthenticated }: UseRepoDataOptions) {
     queryClient.invalidateQueries({ queryKey: queryKeys.user.me() })
   }, [queryClient])
 
-  // Refresh just quota and credentials without resetting repos
+  // Refresh just quota without resetting repos (uses lightweight endpoint)
   const refreshQuotaOnly = useCallback(async () => {
     try {
-      const data = await fetchUserMe()
+      const quota = await apiFetch<Quota>("/api/user/quota")
       queryClient.setQueryData<UserMeResponse>(queryKeys.user.me(), (old) => {
-        if (!old) return data
-        return { ...old, quota: data.quota, credentials: data.credentials }
+        if (!old) return old
+        return { ...old, quota }
       })
     } catch (err) {
       console.error("Failed to refresh quota:", err)

@@ -388,7 +388,22 @@ export async function pollBackgroundAgent(
     logStep("sdkGetBackgroundSession", stepStartedAt)
 
     stepStartedAt = Date.now()
-    const { events: newEvents, sessionId, running } = await bgSession.getEvents()
+    const eventsResult = await bgSession.getEvents() as {
+      events: Event[]
+      sessionId: string | null
+      cursor: string
+      running?: boolean
+    }
+    const { events: newEvents, sessionId } = eventsResult
+    let running: boolean
+    if (typeof eventsResult.running === "boolean") {
+      running = eventsResult.running
+    } else {
+      // Compatibility path for older SDK shape without running in getEvents().
+      stepStartedAt = Date.now()
+      running = await bgSession.isRunning()
+      logStep("isRunning-compat", stepStartedAt)
+    }
     logStep("getEvents", stepStartedAt)
 
     // Accumulate events in DB so all clients share the same stream.

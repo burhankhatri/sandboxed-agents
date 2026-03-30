@@ -308,6 +308,54 @@ export abstract class Provider implements IProvider {
   }
 
   /**
+   * Best-effort no-op write guard for polling paths. Skips writing meta when no
+   * relevant fields changed to reduce sandbox file writes on every poll.
+   */
+  protected async writeSandboxMetaIfChanged(
+    sessionDir: string,
+    next: {
+      currentTurn: number
+      cursor: number
+      rawCursor?: number
+      pid?: number
+      runId?: string
+      outputFile?: string
+      sawEnd?: boolean
+      startedAt?: string
+      provider?: import("../types/index.js").ProviderName
+      sessionId?: string | null
+    },
+    prev?: {
+      currentTurn?: number
+      cursor?: number
+      rawCursor?: number
+      pid?: number
+      runId?: string
+      outputFile?: string
+      sawEnd?: boolean
+      startedAt?: string
+      provider?: import("../types/index.js").ProviderName
+      sessionId?: string | null
+    } | null
+  ): Promise<void> {
+    if (prev) {
+      const unchanged =
+        prev.currentTurn === next.currentTurn &&
+        prev.cursor === next.cursor &&
+        (prev.rawCursor ?? 0) === (next.rawCursor ?? 0) &&
+        prev.pid === next.pid &&
+        prev.runId === next.runId &&
+        prev.outputFile === next.outputFile &&
+        (prev.sawEnd ?? false) === (next.sawEnd ?? false) &&
+        prev.startedAt === next.startedAt &&
+        prev.provider === next.provider &&
+        (prev.sessionId ?? null) === (next.sessionId ?? null)
+      if (unchanged) return
+    }
+    await this.writeSandboxMeta(sessionDir, next)
+  }
+
+  /**
    * Start a new turn in a session directory: one log file per turn, meta in sandbox.
    * Uses currentTurn for this run; currentTurn is incremented when the turn ends (in getEvents).
    * Writes meta with runId/outputFile before starting so reattaching clients see "running" immediately.
@@ -402,13 +450,18 @@ export abstract class Provider implements IProvider {
       debugLog(`isRunning false (no run) sessionDir=${sessionDir}`, this.sessionId)
       return false
     }
-    const donePath = meta.outputFile + ".done"
+    const running = await this.isSandboxBackgroundOutputRunning(meta.outputFile)
+    debugLog(`isRunning ${running} (done file ${running ? "missing" : "exists"}) sessionDir=${sessionDir}`, this.sessionId)
+    return running
+  }
+
+  private async isSandboxBackgroundOutputRunning(outputFile: string): Promise<boolean> {
+    if (!this.sandboxManager?.executeCommand) return false
+    const donePath = outputFile + ".done"
     const escaped = donePath.replace(/'/g, "'\\''")
     const r = await this.sandboxManager.executeCommand(`test -f '${escaped}' 2>/dev/null; echo $?`, 10)
     const doneExists = Number((r.output ?? "").trim().split(/\s+/).pop()) === 0
-    const running = !doneExists
-    debugLog(`isRunning ${running} (done file ${doneExists ? "exists" : "missing"}) sessionDir=${sessionDir}`, this.sessionId)
-    return running
+    return !doneExists
   }
 
   /**
@@ -440,7 +493,7 @@ export abstract class Provider implements IProvider {
       meta.rawCursor != null ? String(meta.rawCursor) : null
     )
     const sawEnd = meta.sawEnd || result.events.some((e) => e.type === "end")
-    const stillRunning = await this.isSandboxBackgroundProcessRunning(sessionDir)
+    const stillRunning = await this.isSandboxBackgroundOutputRunning(outputFile)
     // Clear run when process stopped or we've seen end event (sawEnd can be true before .done file exists)
     if (!stillRunning || sawEnd) {
       const nextTurn = (meta.currentTurn ?? 0) + 1
@@ -453,10 +506,10 @@ export abstract class Provider implements IProvider {
         sessionId: this.sessionId ?? meta.sessionId ?? null,
         ...(sawEnd ? {} : { outputFile: meta.outputFile, runId: meta.runId }),
       }
-      await this.writeSandboxMeta(sessionDir, metaUpdate)
+      await this.writeSandboxMetaIfChanged(sessionDir, metaUpdate, meta)
     }
     if (stillRunning && !sawEnd) {
-      await this.writeSandboxMeta(sessionDir, {
+      await this.writeSandboxMetaIfChanged(sessionDir, {
         currentTurn: meta.currentTurn,
         cursor: Number(result.cursor) || 0,
         rawCursor: Number(result.rawCursor) || meta.rawCursor || 0,
@@ -467,21 +520,17 @@ export abstract class Provider implements IProvider {
         startedAt: meta.startedAt,
         provider: this.name,
         sessionId: this.sessionId,
-      })
+      }, meta)
     }
     if (!stillRunning && !sawEnd) {
       const maxOutputChars = 4096
-      let output: string | undefined
-      if (this.sandboxManager?.executeCommand) {
-        const outResult = await this.sandboxManager.executeCommand(`cat ${outputFile} 2>/dev/null || true`, 10)
-        const raw = (outResult.output ?? "").trim()
-        const nonJsonLines = raw.split("\n").filter((line) => {
-          const t = line.trim()
-          return t && !(t.startsWith("{") && t.endsWith("}"))
-        })
-        const filtered = nonJsonLines.join("\n").trim()
-        output = filtered.length > maxOutputChars ? filtered.slice(-maxOutputChars) : filtered || undefined
-      }
+      const raw = (result.rawOutput ?? "").trim()
+      const nonJsonLines = raw.split("\n").filter((line) => {
+        const t = line.trim()
+        return t && !(t.startsWith("{") && t.endsWith("}"))
+      })
+      const filtered = nonJsonLines.join("\n").trim()
+      const output = filtered.length > maxOutputChars ? filtered.slice(-maxOutputChars) : filtered || undefined
       const crashEvent: Event = {
         type: "agent_crashed",
         message: "Agent process exited without completing (crashed or killed)",
@@ -489,14 +538,14 @@ export abstract class Provider implements IProvider {
       }
       debugLog("session end", this.sessionId ?? meta.sessionId, "reason=crashed", crashEvent.message, output ? `output=${output.slice(0, 200)}${output.length > 200 ? "…" : ""}` : "")
       const nextTurn = (meta.currentTurn ?? 0) + 1
-      await this.writeSandboxMeta(sessionDir, {
+      await this.writeSandboxMetaIfChanged(sessionDir, {
         currentTurn: nextTurn,
         cursor: Number(result.cursor) || 0,
         rawCursor: Number(result.rawCursor) || meta.rawCursor || 0,
         sawEnd: true,
         provider: this.name,
         sessionId: this.sessionId ?? meta.sessionId ?? null,
-      })
+      }, meta)
       return { sessionId: result.sessionId, events: [...result.events, crashEvent], cursor: result.cursor, running: false }
     }
     if (!stillRunning || sawEnd) {
@@ -591,6 +640,7 @@ export abstract class Provider implements IProvider {
     events: Event[]
     cursor: string
     rawCursor: string
+    rawOutput?: string
   }> {
     if (!this.sandboxManager || !this.sandboxManager.executeCommand) {
       throw new Error("Sandbox background mode requires a sandbox with executeCommand support")
@@ -645,6 +695,7 @@ export abstract class Provider implements IProvider {
         events: [],
         cursor: encodeCursor(nextCursor),
         rawCursor: nextRawCursor,
+        rawOutput,
       }
     }
 
@@ -690,6 +741,7 @@ export abstract class Provider implements IProvider {
       events: eventsOut,
       cursor: newCursor,
       rawCursor: newRawCursor,
+      rawOutput,
     }
   }
 

@@ -623,6 +623,7 @@ export function ChatPanel({
           defaultLoopMaxIterations={defaultLoopMaxIterations}
           loopUntilFinishedEnabled={loopUntilFinishedEnabled}
           isMobile={isMobile}
+          inRebaseConflict={!!gitActions.gitDialogs.rebaseConflict?.inRebase}
         />
       </div>
 

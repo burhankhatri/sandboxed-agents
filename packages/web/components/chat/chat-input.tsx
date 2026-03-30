@@ -54,11 +54,13 @@ interface ChatInputProps {
   defaultLoopMaxIterations?: number
   loopUntilFinishedEnabled?: boolean
   isMobile?: boolean
+  /** Rebase conflict: tint the prompt strip red (message list unchanged) */
+  inRebaseConflict?: boolean
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
-    { branch, input, onInputChange, onSend, onStop, onAgentChange, onModelChange, onLoopToggle, onOpenSettings, onOpenSettingsWithHighlight, credentials, defaultLoopMaxIterations = 10, loopUntilFinishedEnabled = false, isMobile },
+    { branch, input, onInputChange, onSend, onStop, onAgentChange, onModelChange, onLoopToggle, onOpenSettings, onOpenSettingsWithHighlight, credentials, defaultLoopMaxIterations = 10, loopUntilFinishedEnabled = false, isMobile, inRebaseConflict = false },
     ref
   ) {
     // Normalize agent value (handle legacy "claude" value from database)
@@ -147,12 +149,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     return (
       <div
         className={cn(
-          "shrink-0 border-t border-border",
-          isMobile ? "px-3 pt-3" : "px-3 py-3 sm:px-6"
+          "shrink-0 border-t",
+          isMobile ? "px-3 pt-3" : "px-3 py-3 sm:px-6",
+          inRebaseConflict
+            ? "border-t-red-700 bg-red-700/12 dark:border-t-red-600 dark:bg-red-950/45"
+            : "border-border"
         )}
         style={isMobile ? { paddingBottom: 'calc(var(--safe-area-inset-bottom) + 0.75rem)' } : undefined}
       >
-        <div className="flex items-end gap-2 rounded-lg border border-border bg-card px-3 py-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
+        <div
+          className={cn(
+            "flex items-end gap-2 rounded-lg border px-3 py-2",
+            inRebaseConflict
+              ? "border-red-800/70 bg-background/95 focus-within:border-red-700 focus-within:ring-1 focus-within:ring-red-700/35 dark:border-red-700/80 dark:focus-within:border-red-600 dark:focus-within:ring-red-600/40"
+              : "border-border bg-card focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20"
+          )}
+        >
           <textarea
             ref={ref}
             value={input}

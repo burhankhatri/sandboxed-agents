@@ -66,7 +66,14 @@ export function ChatHeader({
   const inConflict = rebaseConflict?.inRebase ?? false
 
   return (
-    <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5 sm:px-4">
+    <header
+      className={cn(
+        "flex shrink-0 items-center gap-2 border-b px-3 py-2.5 sm:px-4",
+        inConflict
+          ? "border-b-red-700 bg-red-700/12 dark:border-b-red-600 dark:bg-red-950/45"
+          : "border-border"
+      )}
+    >
       {/* Branch name section */}
       {renaming.renaming ? (
         <div className="flex items-center gap-1.5 min-w-0 ml-2.5">

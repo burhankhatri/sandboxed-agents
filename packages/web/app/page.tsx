@@ -366,7 +366,7 @@ export default function Home() {
               "flex flex-1 flex-col min-h-0 min-w-0 w-full max-w-full overflow-hidden",
               activeBranch &&
                 mobileGitDialogs.rebaseConflict?.inRebase &&
-                "border-2 border-red-600 dark:border-red-500"
+                "border border-red-700 dark:border-red-600"
             )}
           >
             {/* Mobile Header with hamburger and actions */}
@@ -446,7 +446,7 @@ export default function Home() {
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-1",
-            desktopRebaseConflict && "border-2 border-red-600 dark:border-red-500"
+            desktopRebaseConflict && "border border-red-700 dark:border-red-600"
           )}
         >
           {activeBranch && activeRepo ? (

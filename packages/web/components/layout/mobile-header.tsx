@@ -214,7 +214,12 @@ export function MobileHeader({
 
   return (
     <header
-      className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-2 py-2"
+      className={cn(
+        "flex shrink-0 items-center gap-2 border-b px-2 py-2",
+        inConflict
+          ? "border-b-red-700 bg-red-700/12 dark:border-b-red-600 dark:bg-red-950/45"
+          : "border-border bg-card"
+      )}
       style={{ paddingTop: 'calc(var(--safe-area-inset-top) + 0.5rem)' }}
     >
       {/* Hamburger menu button */}

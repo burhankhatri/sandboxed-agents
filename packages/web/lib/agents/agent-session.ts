@@ -357,15 +357,6 @@ export async function pollBackgroundAgent(
   backgroundSessionId: string,
   options: PollBackgroundOptions
 ): Promise<BackgroundPollResult> {
-  const startedAt = Date.now()
-  const logPrefix = "[pollBackgroundAgent]"
-  const logStep = (step: string, stepStartedAt: number) => {
-    console.log(`${logPrefix} ${step} took ${Date.now() - stepStartedAt}ms`, {
-      agentExecutionId: options.agentExecutionId,
-      backgroundSessionId,
-    })
-  }
-
   try {
     const systemPrompt = buildSystemPrompt(
       options.repoPath,
@@ -378,16 +369,13 @@ export async function pollBackgroundAgent(
     // Cast sandbox for SDK version compatibility
     // getBackgroundSession only needs sandbox + backgroundSessionId for polling (no env needed)
 
-    let stepStartedAt = Date.now()
     const bgSession = await sdkGetBackgroundSession({
       sandbox: sandbox as unknown as NonNullable<BackgroundSessionOptions['sandbox']>,
       backgroundSessionId,
       systemPrompt,
       model: modelToUse,
     })
-    logStep("sdkGetBackgroundSession", stepStartedAt)
 
-    stepStartedAt = Date.now()
     const eventsResult = await bgSession.getEvents() as {
       events: Event[]
       sessionId: string | null
@@ -400,28 +388,21 @@ export async function pollBackgroundAgent(
       running = eventsResult.running
     } else {
       // Compatibility path for older SDK shape without running in getEvents().
-      stepStartedAt = Date.now()
       running = await bgSession.isRunning()
-      logStep("isRunning-compat", stepStartedAt)
     }
-    logStep("getEvents", stepStartedAt)
 
     // Accumulate events in DB so all clients share the same stream.
-    stepStartedAt = Date.now()
     const cached = await getAccumulatedEvents(options.agentExecutionId)
-    logStep("getAccumulatedEvents", stepStartedAt)
     const allEvents: Event[] = [...(cached as Event[]), ...newEvents]
 
     const { content, toolCalls, contentBlocks } = buildContentBlocks(allEvents)
 
     // Persist snapshot + accumulated events to DB.
     try {
-      stepStartedAt = Date.now()
       await updateSnapshot(options.agentExecutionId, {
         latestSnapshot: { content, toolCalls, contentBlocks },
         accumulatedEvents: allEvents,
       })
-      logStep("updateSnapshot", stepStartedAt)
     } catch (error) {
       console.error(
         "[agent-session] failed to update snapshot",
@@ -515,11 +496,6 @@ export async function pollBackgroundAgent(
       contentBlocks,
       error: msg,
     }
-  } finally {
-    console.log(`${logPrefix} total took ${Date.now() - startedAt}ms`, {
-      agentExecutionId: options.agentExecutionId,
-      backgroundSessionId,
-    })
   }
 }
 

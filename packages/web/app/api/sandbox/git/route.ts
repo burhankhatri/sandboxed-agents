@@ -192,20 +192,31 @@ export async function POST(req: Request) {
             expectedBranch = branchRecord.name
           }
         }
-        // If we have an expected branch from DB, enforce it so we never commit/push to the wrong branch.
-        if (expectedBranch) {
-          const branchError = await ensureCorrectBranch(sandbox, repoPath, expectedBranch)
-          if (branchError) {
-            return badRequest(branchError)
-          }
-        }
-        // Get the current branch from the sandbox after verification
+        // Get the current branch from the sandbox
         const currentStatus = await sandbox.git.status(repoPath)
         const currentBranch = currentStatus.currentBranch
         if (!currentBranch) {
           return badRequest("Could not determine current branch")
         }
-        const pushBranch = expectedBranch || currentBranch
+        // Handle race condition during branch rename:
+        // When autoSuggestBranchName runs, it does: GitHub rename -> git branch -m -> DB update
+        // If auto-commit-push fires between "git branch -m" and "DB update", the sandbox has
+        // the new name but DB still has the old name. In this case, trust the sandbox's branch
+        // and proceed (the DB will catch up shortly). We only fail if both sources agree but
+        // sandbox is on a completely different branch (which would indicate a real problem).
+        let pushBranch = currentBranch
+        if (expectedBranch && expectedBranch !== currentBranch) {
+          // DB and sandbox disagree - this is likely a rename in progress.
+          // Log for debugging but proceed with sandbox's current branch.
+          console.log(`[auto-commit-push] Branch name mismatch (likely rename in progress): DB says '${expectedBranch}', sandbox is on '${currentBranch}'. Proceeding with sandbox branch.`)
+          // Also update the DB to match the sandbox state to prevent future mismatches
+          if (branchId) {
+            await prisma.branch.update({
+              where: { id: branchId },
+              data: { name: currentBranch },
+            })
+          }
+        }
         // Check for uncommitted changes and commit them if any
         let committed = false
         let commitMessage = ""

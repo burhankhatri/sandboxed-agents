@@ -681,11 +681,26 @@ export async function POST(req: Request) {
           return badRequest(renameBranchError)
         }
 
+        // Update branch name in database FIRST to prevent race conditions with auto-commit-push.
+        // If auto-commit-push runs during rename, it will see the new name in DB and wait for
+        // the sandbox to catch up, rather than seeing old DB name + new sandbox name.
+        const branchRecord = await prisma.branch.findFirst({
+          where: {
+            name: currentBranch,
+            sandbox: { sandboxId },
+          },
+        })
+        if (branchRecord) {
+          await prisma.branch.update({
+            where: { id: branchRecord.id },
+            data: { name: newName },
+          })
+        }
+
         // Track whether branch exists on GitHub (for setting upstream later)
         let branchExistsOnGitHub = false
 
-        // Try to rename on GitHub first via API
-        // This ensures GitHub and sandbox stay in sync - if GitHub fails, we haven't touched local
+        // Try to rename on GitHub via API
         if (githubToken && repoOwner && repoApiName) {
           const renameRes = await fetch(
             `https://api.github.com/repos/${repoOwner}/${repoApiName}/branches/${currentBranch}/rename`,
@@ -703,7 +718,13 @@ export async function POST(req: Request) {
             branchExistsOnGitHub = true
           } else if (renameRes.status !== 404) {
             // 404 means branch doesn't exist on GitHub yet - that's okay, we'll push after local rename
-            // Any other error is a real failure
+            // Any other error is a real failure - roll back DB change
+            if (branchRecord) {
+              await prisma.branch.update({
+                where: { id: branchRecord.id },
+                data: { name: currentBranch },
+              })
+            }
             const errorData = await renameRes.json().catch(() => ({}))
             const errorMessage = (errorData as { message?: string }).message || `Status ${renameRes.status}`
             return Response.json(
@@ -718,6 +739,13 @@ export async function POST(req: Request) {
           `cd ${repoPath} && git branch -m ${currentBranch} ${newName} 2>&1`
         )
         if (renameResult.exitCode) {
+          // Roll back DB change on local rename failure
+          if (branchRecord) {
+            await prisma.branch.update({
+              where: { id: branchRecord.id },
+              data: { name: currentBranch },
+            })
+          }
           return Response.json({ error: "Local rename failed: " + renameResult.result }, { status: 500 })
         }
 
@@ -735,20 +763,6 @@ export async function POST(req: Request) {
               return Response.json({ error: "Push failed: " + renamePushResult.error }, { status: 500 })
             }
           }
-        }
-
-        // Update branch name in database
-        const branchRecord = await prisma.branch.findFirst({
-          where: {
-            name: currentBranch,
-            sandbox: { sandboxId },
-          },
-        })
-        if (branchRecord) {
-          await prisma.branch.update({
-            where: { id: branchRecord.id },
-            data: { name: newName },
-          })
         }
 
         return Response.json({ success: true })

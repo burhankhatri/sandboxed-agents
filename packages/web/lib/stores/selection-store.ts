@@ -29,38 +29,29 @@ const initialState: SelectionState = {
   initialSelectionDone: false,
 }
 
-export const useSelectionStore = create<SelectionState & SelectionActions>()(
-  devtools(
-    (set, get) => ({
-      ...initialState,
+const storeCreator = (set: (partial: Partial<SelectionState & SelectionActions>) => void, get: () => SelectionState & SelectionActions) => ({
+  ...initialState,
 
-      setActiveRepoId: (repoId) =>
-        set({ activeRepoId: repoId }, false, "setActiveRepoId"),
+  setActiveRepoId: (repoId: string | null) => set({ activeRepoId: repoId }),
+  setActiveBranchId: (branchId: string | null) => set({ activeBranchId: branchId }),
 
-      setActiveBranchId: (branchId) =>
-        set({ activeBranchId: branchId }, false, "setActiveBranchId"),
+  selectRepo: (repoId: string, firstBranchId?: string | null) =>
+    set({ activeRepoId: repoId, activeBranchId: firstBranchId ?? null }),
 
-      selectRepo: (repoId, firstBranchId) =>
-        set(
-          { activeRepoId: repoId, activeBranchId: firstBranchId ?? null },
-          false,
-          "selectRepo"
-        ),
+  selectBranch: (branchId: string) => set({ activeBranchId: branchId }),
 
-      selectBranch: (branchId) =>
-        set({ activeBranchId: branchId }, false, "selectBranch"),
+  updateActiveBranchId: (oldId: string, newId: string) => {
+    if (get().activeBranchId === oldId) {
+      set({ activeBranchId: newId })
+    }
+  },
 
-      updateActiveBranchId: (oldId, newId) => {
-        if (get().activeBranchId === oldId) {
-          set({ activeBranchId: newId }, false, "updateActiveBranchId")
-        }
-      },
+  markInitialSelectionDone: () => set({ initialSelectionDone: true }),
+  resetSelection: () => set(initialState),
+})
 
-      markInitialSelectionDone: () =>
-        set({ initialSelectionDone: true }, false, "markInitialSelectionDone"),
-
-      resetSelection: () => set(initialState, false, "resetSelection"),
-    }),
-    { name: "selection-store" }
-  )
-)
+// Only use devtools in development
+export const useSelectionStore =
+  process.env.NODE_ENV === "development"
+    ? create<SelectionState & SelectionActions>()(devtools(storeCreator, { name: "selection-store" }))
+    : create<SelectionState & SelectionActions>()(storeCreator)

@@ -11,9 +11,6 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 
-/**
- * UI Store State
- */
 interface UIState {
   // Sidebar
   mobileSidebarOpen: boolean
@@ -43,9 +40,6 @@ interface UIState {
   pendingStartCommit: string | null
 }
 
-/**
- * UI Store Actions
- */
 interface UIActions {
   // Sidebar actions
   openMobileSidebar: () => void
@@ -92,9 +86,6 @@ interface UIActions {
   resetUI: () => void
 }
 
-/**
- * Initial UI state
- */
 const initialState: UIState = {
   mobileSidebarOpen: false,
   mobileSandboxToggleLoading: false,
@@ -111,95 +102,57 @@ const initialState: UIState = {
   pendingStartCommit: null,
 }
 
-/**
- * UI Store
- *
- * Centralized store for all UI state. Use this instead of scattered
- * useState calls throughout the app.
- *
- * Example usage:
- * ```tsx
- * import { useUIStore } from "@/lib/stores/ui-store"
- *
- * function MyComponent() {
- *   const { settingsOpen, openSettings, closeSettings } = useUIStore()
- *
- *   return (
- *     <button onClick={openSettings}>Open Settings</button>
- *   )
- * }
- * ```
- */
-export const useUIStore = create<UIState & UIActions>()(
-  devtools(
-    (set) => ({
-      ...initialState,
+const storeCreator = (set: (partial: Partial<UIState & UIActions>) => void, get: () => UIState & UIActions) => ({
+  ...initialState,
 
-      // Sidebar actions
-      openMobileSidebar: () => set({ mobileSidebarOpen: true }, false, "openMobileSidebar"),
-      closeMobileSidebar: () => set({ mobileSidebarOpen: false }, false, "closeMobileSidebar"),
-      toggleMobileSidebar: () =>
-        set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen }), false, "toggleMobileSidebar"),
-      setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }, false, "setMobileSidebarOpen"),
+  // Sidebar actions
+  openMobileSidebar: () => set({ mobileSidebarOpen: true }),
+  closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
+  toggleMobileSidebar: () => set({ mobileSidebarOpen: !get().mobileSidebarOpen }),
+  setMobileSidebarOpen: (open: boolean) => set({ mobileSidebarOpen: open }),
 
-      // Loading actions
-      setMobileSandboxToggleLoading: (loading) =>
-        set({ mobileSandboxToggleLoading: loading }, false, "setMobileSandboxToggleLoading"),
-      setMobilePrLoading: (loading) =>
-        set({ mobilePrLoading: loading }, false, "setMobilePrLoading"),
+  // Loading actions
+  setMobileSandboxToggleLoading: (loading: boolean) => set({ mobileSandboxToggleLoading: loading }),
+  setMobilePrLoading: (loading: boolean) => set({ mobilePrLoading: loading }),
 
-      // Settings modal actions
-      openSettings: (highlightField) =>
-        set(
-          { settingsOpen: true, settingsHighlightField: highlightField ?? null },
-          false,
-          "openSettings"
-        ),
-      closeSettings: () =>
-        set({ settingsOpen: false, settingsHighlightField: null }, false, "closeSettings"),
-      clearSettingsHighlight: () =>
-        set({ settingsHighlightField: null }, false, "clearSettingsHighlight"),
+  // Settings modal actions
+  openSettings: (highlightField?: string) =>
+    set({ settingsOpen: true, settingsHighlightField: highlightField ?? null }),
+  closeSettings: () => set({ settingsOpen: false, settingsHighlightField: null }),
+  clearSettingsHighlight: () => set({ settingsHighlightField: null }),
 
-      // Add repo modal actions
-      openAddRepo: () => set({ addRepoOpen: true }, false, "openAddRepo"),
-      closeAddRepo: () => set({ addRepoOpen: false }, false, "closeAddRepo"),
+  // Add repo modal actions
+  openAddRepo: () => set({ addRepoOpen: true }),
+  closeAddRepo: () => set({ addRepoOpen: false }),
 
-      // Repo settings modal actions
-      openRepoSettings: () => set({ repoSettingsOpen: true }, false, "openRepoSettings"),
-      closeRepoSettings: () =>
-        set({ repoSettingsOpen: false, repoEnvVars: null }, false, "closeRepoSettings"),
-      setRepoEnvVars: (envVars) => set({ repoEnvVars: envVars }, false, "setRepoEnvVars"),
+  // Repo settings modal actions
+  openRepoSettings: () => set({ repoSettingsOpen: true }),
+  closeRepoSettings: () => set({ repoSettingsOpen: false, repoEnvVars: null }),
+  setRepoEnvVars: (envVars: Record<string, boolean> | null) => set({ repoEnvVars: envVars }),
 
-      // Mobile diff modal actions
-      openMobileDiff: () => set({ mobileDiffOpen: true }, false, "openMobileDiff"),
-      closeMobileDiff: () => set({ mobileDiffOpen: false }, false, "closeMobileDiff"),
+  // Mobile diff modal actions
+  openMobileDiff: () => set({ mobileDiffOpen: true }),
+  closeMobileDiff: () => set({ mobileDiffOpen: false }),
 
-      // Git history panel actions
-      openGitHistory: () => set({ gitHistoryOpen: true }, false, "openGitHistory"),
-      closeGitHistory: () => set({ gitHistoryOpen: false }, false, "closeGitHistory"),
-      toggleGitHistory: () =>
-        set((state) => ({ gitHistoryOpen: !state.gitHistoryOpen }), false, "toggleGitHistory"),
-      triggerGitHistoryRefresh: () =>
-        set(
-          (state) => ({ gitHistoryRefreshTrigger: state.gitHistoryRefreshTrigger + 1 }),
-          false,
-          "triggerGitHistoryRefresh"
-        ),
+  // Git history panel actions
+  openGitHistory: () => set({ gitHistoryOpen: true }),
+  closeGitHistory: () => set({ gitHistoryOpen: false }),
+  toggleGitHistory: () => set({ gitHistoryOpen: !get().gitHistoryOpen }),
+  triggerGitHistoryRefresh: () => set({ gitHistoryRefreshTrigger: get().gitHistoryRefreshTrigger + 1 }),
 
-      // Desktop rebase conflict
-      setDesktopRebaseConflict: (conflict) =>
-        set({ desktopRebaseConflict: conflict }, false, "setDesktopRebaseConflict"),
+  // Desktop rebase conflict
+  setDesktopRebaseConflict: (conflict: boolean) => set({ desktopRebaseConflict: conflict }),
 
-      // Pending start commit
-      setPendingStartCommit: (commit) =>
-        set({ pendingStartCommit: commit }, false, "setPendingStartCommit"),
-      clearPendingStartCommit: () =>
-        set({ pendingStartCommit: null }, false, "clearPendingStartCommit"),
+  // Pending start commit
+  setPendingStartCommit: (commit: string | null) => set({ pendingStartCommit: commit }),
+  clearPendingStartCommit: () => set({ pendingStartCommit: null }),
 
-      // Reset all UI state
-      resetUI: () => set(initialState, false, "resetUI"),
-    }),
-    { name: "ui-store" }
-  )
-)
+  // Reset all UI state
+  resetUI: () => set(initialState),
+})
 
+// Only use devtools in development
+export const useUIStore =
+  process.env.NODE_ENV === "development"
+    ? create<UIState & UIActions>()(devtools(storeCreator, { name: "ui-store" }))
+    : create<UIState & UIActions>()(storeCreator)

@@ -168,7 +168,6 @@ export function ChatHeader({
               {branch.status === BRANCH_STATUS.STOPPED ? "Start sandbox" : "Pause sandbox"}
             </TooltipContent>
           </Tooltip>
-          <div className="mx-1.5 h-4 w-px bg-border shrink-0" />
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -243,31 +242,34 @@ export function ChatHeader({
           }
 
           return (
-            <Tooltip key={action.label}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => gitActions.handleHeaderAction(action.action)}
-                  disabled={!isReady || (isBusy && !canUseWhileBusy) || isPRLoading}
-                  className={cn(
-                    "flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
-                    hasPR || hasDiffChanges
-                      ? "text-green-400"
-                      : isActive
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                >
-                  {isPRLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <action.icon className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {hasPR ? "Open PR" : action.label}
-              </TooltipContent>
-            </Tooltip>
+            <span key={action.label} className="contents">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => gitActions.handleHeaderAction(action.action)}
+                    disabled={!isReady || (isBusy && !canUseWhileBusy) || isPRLoading}
+                    className={cn(
+                      "flex cursor-pointer h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                      hasPR || hasDiffChanges
+                        ? "text-green-400"
+                        : isActive
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}
+                  >
+                    {isPRLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <action.icon className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {hasPR ? "Open PR" : action.label}
+                </TooltipContent>
+              </Tooltip>
+              {action.action === "rebase" && <div className="mx-1.5 h-4 w-px bg-border shrink-0" />}
+            </span>
           )
         })}
       </div>

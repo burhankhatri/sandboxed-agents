@@ -243,10 +243,10 @@ async function fetchExecutionStatus(messageId: string): Promise<{
 /**
  * Processes a single execution poll response
  */
-async function processExecution(
-  messageId: string,
-  store: ExecutionState & ExecutionActions
-): Promise<void> {
+async function processExecution(messageId: string): Promise<void> {
+  // Get fresh state on each call - don't use stale snapshots!
+  // This ensures we always have the latest callbacks from React
+  const store = useExecutionStore.getState()
   const execution = store.activeExecutions.get(messageId)
   if (!execution) return
 
@@ -445,8 +445,9 @@ async function pollAllExecutions(): Promise<void> {
     if (executions.length === 0) return
 
     // Poll all executions in parallel
+    // Note: processExecution gets fresh state internally, so we don't pass the store
     await Promise.all(
-      executions.map(messageId => processExecution(messageId, store))
+      executions.map(messageId => processExecution(messageId))
     )
   } catch (err) {
     console.error("[execution-poll] poll loop error", err)

@@ -201,7 +201,23 @@ export function useBranchOperations({
     // (don't rely on activeRepo from closure which may be stale during polling)
     setRepos((prev) => {
       const targetRepo = prev.find(r => r.branches.some(b => b.id === branchId))
-      if (!targetRepo) return prev
+      if (!targetRepo) {
+        console.warn("[handleUpdateMessage] repo not found for branchId", { branchId, messageId })
+        return prev
+      }
+      const targetBranch = targetRepo.branches.find(b => b.id === branchId)
+      const targetMessage = targetBranch?.messages.find(m => m.id === messageId)
+      console.log("[handleUpdateMessage] updating", {
+        branchId,
+        messageId,
+        contentLength: (updates.content || "").length,
+        repoFound: !!targetRepo,
+        branchFound: !!targetBranch,
+        messageFound: !!targetMessage,
+      })
+      if (!targetMessage) {
+        console.warn("[handleUpdateMessage] message not found!", { branchId, messageId, messagesInBranch: targetBranch?.messages.map(m => m.id) })
+      }
       return updateMessageInBranch(prev, targetRepo.id, branchId, messageId, updates)
     })
 

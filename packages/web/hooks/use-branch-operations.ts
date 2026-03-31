@@ -205,8 +205,28 @@ export function useBranchOperations({
         console.warn("[handleUpdateMessage] no repo found for branchId", { branchId, messageId })
         return prev
       }
-      console.log("[handleUpdateMessage] updating", { branchId, messageId, contentLength: (updates.content || "").length, repoId: targetRepo.id })
-      return updateMessageInBranch(prev, targetRepo.id, branchId, messageId, updates)
+      const targetBranch = targetRepo.branches.find(b => b.id === branchId)
+      const targetMessage = targetBranch?.messages.find(m => m.id === messageId)
+      console.log("[handleUpdateMessage] updating", {
+        branchId,
+        messageId,
+        contentLength: (updates.content || "").length,
+        repoId: targetRepo.id,
+        branchFound: !!targetBranch,
+        messageFound: !!targetMessage,
+        prevContentLength: (targetMessage?.content || "").length,
+        messagesInBranch: targetBranch?.messages.length,
+      })
+      const result = updateMessageInBranch(prev, targetRepo.id, branchId, messageId, updates)
+      // Verify the update happened
+      const updatedRepo = result.find(r => r.id === targetRepo.id)
+      const updatedBranch = updatedRepo?.branches.find(b => b.id === branchId)
+      const updatedMessage = updatedBranch?.messages.find(m => m.id === messageId)
+      console.log("[handleUpdateMessage] result", {
+        updatedContentLength: (updatedMessage?.content || "").length,
+        sameReference: prev === result,
+      })
+      return result
     })
 
     return updateMessageMutation.mutateAsync({ messageId, updates }).then(() => {})

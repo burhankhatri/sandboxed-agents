@@ -42,27 +42,14 @@ export interface CodeAgentSandbox {
    * this to avoid blocking on the command when using executeCommand.
    */
   executeBackground?(options: ExecuteBackgroundOptions): Promise<{ pid: number }>
-  /**
-   * Optional: kill a process by pid.
-   * @param pid Process ID to kill
-   * @param processName Optional process name for pkill fallback
-   */
+  /** Kill a process by pid. */
   killBackgroundProcess?(pid: number, processName?: string): Promise<void>
 
-  /**
-   * Optional: check if a process is actually running (not zombie).
-   * Uses ps -o state for accurate detection.
-   */
-  isProcessRunning?(pid: number): Promise<boolean>
-
-  /**
-   * Optional: optimized combined poll that reads meta, output, and done status in one command.
-   * Returns everything needed for a poll cycle in a single round trip.
-   */
+  /** Optimized poll: reads meta, output, and done status in fewer commands. */
   pollBackgroundState?(sessionDir: string): Promise<{
-    meta: string | null      // Raw meta.json content
-    output: string           // Raw output file content
-    done: boolean            // Whether .done file exists
+    meta: string | null
+    output: string
+    done: boolean
   } | null>
 }
 

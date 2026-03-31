@@ -146,9 +146,17 @@ export function ChatHeader({
             </svg>
             <span className="truncate text-xs font-mono text-muted-foreground group-hover/branch-link:text-foreground transition-colors">{branch.name}</span>
           </a>
+          {renaming.suggesting && (
+            <span className="inline-flex shrink-0" title="Renaming branch…" aria-label="Renaming branch">
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-hidden />
+            </span>
+          )}
           <button
+            type="button"
             onClick={renaming.startRenaming}
-            className="cursor-pointer px-1"
+            disabled={renaming.suggesting}
+            className="cursor-pointer px-1 disabled:opacity-40 disabled:pointer-events-none"
+            title={renaming.suggesting ? "Renaming…" : undefined}
           >
             <Pencil className="h-3 w-3 shrink-0 text-muted-foreground/60 hover:text-muted-foreground transition-colors" />
           </button>

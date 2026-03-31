@@ -163,10 +163,9 @@ export function useBranchRenaming({
     const targetBranchName = branch.name
     const targetSandboxId = branch.sandboxId
 
-    // Show loading state in the branch title text field
+    // Background rename only — do not set `renaming` (that mounts the title input
+    // with autoFocus and steals focus from the chat textarea).
     setSuggestingBranchId(targetBranchId)
-    setRenaming(true)
-    setRenameValue("loading...")
 
     try {
       const res = await fetch("/api/branches/suggest-name", {
@@ -209,9 +208,7 @@ export function useBranchRenaming({
       // Silently fail - auto-suggestion is not critical
       console.warn("Auto branch name suggestion failed:", err)
     } finally {
-      // Exit renaming mode and reset state
       setSuggestingBranchId(null)
-      setRenaming(false)
     }
   }, [branch.id, branch.name, branch.hasCustomName, branch.sandboxId, repoName, repoFullName, onUpdateBranch])
 

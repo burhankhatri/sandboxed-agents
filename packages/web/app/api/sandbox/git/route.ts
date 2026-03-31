@@ -180,63 +180,20 @@ export async function POST(req: Request) {
           }, { status: 409 })
         }
 
-        // Get current branch from sandbox first
+        // Get current branch from sandbox
         const currentStatus = await sandbox.git.status(repoPath)
         const currentBranch = currentStatus.currentBranch
         if (!currentBranch) {
           return badRequest("Could not determine current branch")
         }
 
-        // Check for uncommitted changes
+        // Commit uncommitted changes if any (no branch verification needed for local commit)
+        let committed = false
+        let commitMessage = ""
         const statusResult = await sandbox.process.executeCommand(
           `cd ${repoPath} && git status --porcelain 2>&1`
         )
-        const hasUncommittedChanges = !statusResult.exitCode && statusResult.result.trim()
-
-        // Check if there are unpushed commits by comparing local HEAD with remote
-        // Use ls-remote since single-branch clones don't have origin/branchName refs
-        const localHead = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git rev-parse HEAD 2>/dev/null`
-        )
-        const remoteHead = await sandbox.process.executeCommand(
-          `cd ${repoPath} && git ls-remote origin refs/heads/${currentBranch} 2>/dev/null | cut -f1`
-        )
-        const localSha = localHead.result.trim()
-        const remoteSha = remoteHead.result.trim()
-        const hasUnpushedCommits = localSha && localSha !== remoteSha
-
-        // Early exit if there's nothing to do - avoids unnecessary branch verification
-        // which can fail during branch rename operations
-        if (!hasUncommittedChanges && !hasUnpushedCommits) {
-          return Response.json({ committed: false, pushed: false, commitMessage: "", currentBranch })
-        }
-
-        // Look up the current branch name from DB using branchId
-        // This avoids race conditions where client has stale branch name after rename
-        const branchId = body.branchId
-        let expectedBranch: string | null = null
-        if (branchId) {
-          const branchRecord = await prisma.branch.findUnique({
-            where: { id: branchId },
-            select: { name: true },
-          })
-          if (branchRecord) {
-            expectedBranch = branchRecord.name
-          }
-        }
-        // If we have an expected branch from DB, enforce it so we never commit/push to the wrong branch.
-        if (expectedBranch) {
-          const branchError = await ensureCorrectBranch(sandbox, repoPath, expectedBranch)
-          if (branchError) {
-            return badRequest(branchError)
-          }
-        }
-        const pushBranch = expectedBranch || currentBranch
-
-        // Commit uncommitted changes if any
-        let committed = false
-        let commitMessage = ""
-        if (hasUncommittedChanges) {
+        if (!statusResult.exitCode && statusResult.result.trim()) {
           // Stage all changes first so we can get a complete diff
           await sandbox.process.executeCommand(
             `cd ${repoPath} && git add -A 2>&1`
@@ -272,21 +229,52 @@ export async function POST(req: Request) {
           }
         }
 
-        // Push if needed (re-check in case commit added new commits)
-        let pushed = false
-        const finalLocalHead = await sandbox.process.executeCommand(
+        // Check if there are unpushed commits by comparing local HEAD with remote
+        // Use ls-remote since single-branch clones don't have origin/branchName refs
+        const localHead = await sandbox.process.executeCommand(
           `cd ${repoPath} && git rev-parse HEAD 2>/dev/null`
         )
-        const finalLocalSha = finalLocalHead.result.trim()
-        const needsPush = finalLocalSha && finalLocalSha !== remoteSha
-        if (needsPush) {
-          const pushResult = await pushWithRetry(sandbox, repoPath, githubToken, pushBranch)
-          if (!pushResult.success) {
-            return Response.json({ error: "Push failed: " + pushResult.error }, { status: 500 })
-          }
-          pushed = true
+        const remoteHead = await sandbox.process.executeCommand(
+          `cd ${repoPath} && git ls-remote origin refs/heads/${currentBranch} 2>/dev/null | cut -f1`
+        )
+        const localSha = localHead.result.trim()
+        const remoteSha = remoteHead.result.trim()
+        const needsPush = localSha && localSha !== remoteSha
+
+        // Early exit if nothing to push - avoids unnecessary branch verification
+        // which can fail during branch rename operations
+        if (!needsPush) {
+          return Response.json({ committed, pushed: false, commitMessage, currentBranch })
         }
-        return Response.json({ committed, pushed, commitMessage, currentBranch: pushBranch })
+
+        // Look up the current branch name from DB using branchId
+        // This avoids race conditions where client has stale branch name after rename
+        const branchId = body.branchId
+        let expectedBranch: string | null = null
+        if (branchId) {
+          const branchRecord = await prisma.branch.findUnique({
+            where: { id: branchId },
+            select: { name: true },
+          })
+          if (branchRecord) {
+            expectedBranch = branchRecord.name
+          }
+        }
+        // If we have an expected branch from DB, enforce it so we never commit/push to the wrong branch.
+        if (expectedBranch) {
+          const branchError = await ensureCorrectBranch(sandbox, repoPath, expectedBranch)
+          if (branchError) {
+            return badRequest(branchError)
+          }
+        }
+        const pushBranch = expectedBranch || currentBranch
+
+        // Push
+        const pushResult = await pushWithRetry(sandbox, repoPath, githubToken, pushBranch)
+        if (!pushResult.success) {
+          return Response.json({ error: "Push failed: " + pushResult.error }, { status: 500 })
+        }
+        return Response.json({ committed, pushed: true, commitMessage, currentBranch: pushBranch })
       }
 
       case "pull": {

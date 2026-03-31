@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { Suspense, useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { useExecutionPoller } from "@/hooks/use-execution-poller"
 import type { Branch, Message, ToolCall, ContentBlock } from "@/lib/shared/types"
@@ -153,7 +153,7 @@ function AgentPanel({ initial }: { initial: PanelState }) {
   )
 }
 
-export default function PollingTestPage() {
+function PollingTestPageInner() {
   const searchParams = useSearchParams()
   const [panels, setPanels] = useState<PanelState[]>([])
 
@@ -184,5 +184,13 @@ export default function PollingTestPage() {
         <AgentPanel key={p.branch.id} initial={p} />
       ))}
     </div>
+  )
+}
+
+export default function PollingTestPage() {
+  return (
+    <Suspense>
+      <PollingTestPageInner />
+    </Suspense>
   )
 }

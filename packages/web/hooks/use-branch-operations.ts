@@ -157,17 +157,11 @@ export function useBranchOperations({
   // Add a message to a branch
   const handleAddMessage = useCallback(async (branchId: string, message: Message): Promise<string> => {
     const now = Date.now()
-    console.log("[handleAddMessage] adding message optimistically", { branchId, messageId: message.id, role: message.role })
     // Add message and bump branch to top of list
     // Find the repo inside setRepos to use latest state (not stale closure)
     setRepos((prev) => {
       const targetRepo = prev.find(r => r.branches.some(b => b.id === branchId))
-      if (!targetRepo) {
-        console.warn("[handleAddMessage] repo not found for optimistic add", { branchId, messageId: message.id })
-        return prev
-      }
-      const targetBranch = targetRepo.branches.find(b => b.id === branchId)
-      console.log("[handleAddMessage] before add", { branchId, messageId: message.id, currentMessageCount: targetBranch?.messages.length })
+      if (!targetRepo) return prev
       return updateBranchInRepo(
         addMessageToBranch(prev, targetRepo.id, branchId, message),
         targetRepo.id,
@@ -180,30 +174,16 @@ export function useBranchOperations({
     try {
       const data = await addMessageMutation.mutateAsync({ branchId, message })
       const dbId = data.message?.id
-      console.log("[handleAddMessage] DB save complete", { branchId, optimisticId: message.id, dbId })
 
       if (dbId && dbId !== message.id) {
         // Update local state with the real database ID
         // Find repo inside setRepos to use latest state
-        console.log("[handleAddMessage] updating ID from optimistic to DB", { branchId, from: message.id, to: dbId })
         setRepos((prev) => {
           const targetRepo = prev.find(r => r.branches.some(b => b.id === branchId))
-          if (!targetRepo) {
-            console.warn("[handleAddMessage] repo not found for ID update", { branchId, optimisticId: message.id })
-            return prev
-          }
+          if (!targetRepo) return prev
           const targetBranch = targetRepo.branches.find(b => b.id === branchId)
           const messageExists = targetBranch?.messages.some(m => m.id === message.id)
-          console.log("[handleAddMessage] checking for optimistic message", {
-            branchId,
-            optimisticId: message.id,
-            messageExists,
-            currentMessages: targetBranch?.messages.map(m => m.id)
-          })
-          if (!messageExists) {
-            console.warn("[handleAddMessage] optimistic message not found, cannot update ID", { branchId, optimisticId: message.id })
-            return prev
-          }
+          if (!messageExists) return prev
           return updateMessageInBranch(prev, targetRepo.id, branchId, message.id, { id: dbId })
         })
         return dbId
@@ -221,23 +201,7 @@ export function useBranchOperations({
     // (don't rely on activeRepo from closure which may be stale during polling)
     setRepos((prev) => {
       const targetRepo = prev.find(r => r.branches.some(b => b.id === branchId))
-      if (!targetRepo) {
-        console.warn("[handleUpdateMessage] repo not found for branchId", { branchId, messageId })
-        return prev
-      }
-      const targetBranch = targetRepo.branches.find(b => b.id === branchId)
-      const targetMessage = targetBranch?.messages.find(m => m.id === messageId)
-      console.log("[handleUpdateMessage] updating", {
-        branchId,
-        messageId,
-        contentLength: (updates.content || "").length,
-        repoFound: !!targetRepo,
-        branchFound: !!targetBranch,
-        messageFound: !!targetMessage,
-      })
-      if (!targetMessage) {
-        console.warn("[handleUpdateMessage] message not found!", { branchId, messageId, messagesInBranch: targetBranch?.messages.map(m => m.id) })
-      }
+      if (!targetRepo) return prev
       return updateMessageInBranch(prev, targetRepo.id, branchId, messageId, updates)
     })
 

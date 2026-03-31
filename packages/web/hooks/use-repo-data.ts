@@ -188,7 +188,6 @@ export function useRepoData({ isAuthenticated }: UseRepoDataOptions) {
         exec => exec.branchId === branchId
       )
       if (hasActiveExecution) {
-        console.log("[loadBranchMessages] skipping - active execution for branch", { branchId })
         return
       }
 
@@ -217,7 +216,6 @@ export function useRepoData({ isAuthenticated }: UseRepoDataOptions) {
           exec => exec.branchId === branchId
         )
         if (hasActiveExecutionAfterFetch) {
-          console.log("[loadBranchMessages] skipping setRepos - active execution started during fetch", { branchId })
           return
         }
 

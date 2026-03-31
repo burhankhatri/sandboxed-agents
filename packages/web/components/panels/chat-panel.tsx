@@ -454,15 +454,11 @@ export function ChatPanel({
 
         const data = await res.json()
         if (data.execution?.messageId && data.execution?.status === "running") {
-          console.log("[ChatPanel] Recovering active execution after refresh", {
-            branchId: branch.id,
-            messageId: data.execution.messageId,
-          })
           // Resume polling for this execution
           startPollingRef.current(data.execution.messageId, branch, data.execution.executionId)
         }
-      } catch (err) {
-        console.error("[ChatPanel] Failed to check for active execution", err)
+      } catch {
+        // Failed to check for active execution - not critical
       }
     }
 

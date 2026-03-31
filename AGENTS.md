@@ -1,6 +1,6 @@
 # Agent instructions
 
-Primary reference for coding agents working in this repo. For a one-screen pointer and navigation map, see **[CLAUDE.md](./CLAUDE.md)**.
+Primary reference for coding agents working in this repo.
 
 ---
 

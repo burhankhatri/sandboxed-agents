@@ -172,6 +172,7 @@ test.describe("real app: send → stream → complete → refresh", () => {
     console.log("Post-refresh content:", postRefreshContent?.slice(0, 100))
     expect(postRefreshContent?.length).toBeGreaterThan(0)
 
-    console.log("All real-app assertions passed")
+    console.log("All real-app assertions passed — pausing 5s for visual inspection")
+    await page.waitForTimeout(3_000)
   })
 })

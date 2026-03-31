@@ -45,7 +45,7 @@ export async function GET() {
       executionId: exec.executionId,
       messageId: exec.messageId,
       status: exec.status,
-      sandboxId: exec.sandboxId || exec.message.branch.sandboxId,
+      sandboxId: exec.sandboxId,
       branchId: exec.message.branchId,
       branchName: exec.message.branch.name,
       repoId: exec.message.branch.repo.id,

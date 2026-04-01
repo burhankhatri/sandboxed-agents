@@ -46,6 +46,58 @@ async function setSessionCookie() {
   })
 }
 
+/**
+ * Remove all repos/branches/sandboxes for the E2E user and delete Daytona VMs.
+ * Needed so /api/user/me (top-N repos) still includes the repo the test navigates to,
+ * and so we never auto-select an old branch stuck in "running" without an execution.
+ */
+async function wipeE2eUserData(daytona: Daytona) {
+  const rows = await prisma.sandbox.findMany({
+    where: { userId: E2E_USER_ID },
+    select: { sandboxId: true },
+  })
+  for (const { sandboxId } of rows) {
+    try {
+      const s = await daytona.get(sandboxId)
+      await s.delete()
+    } catch {
+      /* best effort */
+    }
+  }
+
+  const repos = await prisma.repo.findMany({
+    where: { userId: E2E_USER_ID },
+    select: { id: true },
+  })
+  const repoIds = repos.map((r) => r.id)
+
+  if (repoIds.length === 0) return
+
+  const branchIds = (
+    await prisma.branch.findMany({
+      where: { repoId: { in: repoIds } },
+      select: { id: true },
+    })
+  ).map((b) => b.id)
+
+  if (branchIds.length > 0) {
+    const messageIds = (
+      await prisma.message.findMany({
+        where: { branchId: { in: branchIds } },
+        select: { id: true },
+      })
+    ).map((m) => m.id)
+
+    if (messageIds.length > 0) {
+      await prisma.agentExecution.deleteMany({ where: { messageId: { in: messageIds } } })
+      await prisma.message.deleteMany({ where: { id: { in: messageIds } } })
+    }
+    await prisma.sandbox.deleteMany({ where: { branchId: { in: branchIds } } })
+    await prisma.branch.deleteMany({ where: { id: { in: branchIds } } })
+  }
+  await prisma.repo.deleteMany({ where: { id: { in: repoIds } } })
+}
+
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === "production") {
     return Response.json({ error: "Not available in production" }, { status: 404 })
@@ -61,12 +113,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 1. Create test user + auth cookie
+    // 1. Test user + wipe previous E2E rows so /api/user/me includes the new repo (see wipeE2eUserData).
     await ensureTestUser()
+    const daytona = new Daytona({ apiKey: daytonaApiKey })
+    await wipeE2eUserData(daytona)
     await setSessionCookie()
 
     // 2. Create Daytona sandboxes concurrently
-    const daytona = new Daytona({ apiKey: daytonaApiKey })
     const sandboxes = await Promise.all(
       Array.from({ length: count }, () => daytona.create())
     )
@@ -158,51 +211,16 @@ export async function DELETE(req: Request) {
     return Response.json({ error: "Not available in production" }, { status: 404 })
   }
 
-  const body = await req.json().catch(() => ({}))
-  const sandboxIds: string[] = body.sandboxIds || []
+  await req.json().catch(() => ({}))
 
   const daytonaApiKey = process.env.DAYTONA_API_KEY
   if (!daytonaApiKey) {
     return Response.json({ error: "DAYTONA_API_KEY not set" }, { status: 500 })
   }
 
-  const daytona = new Daytona({ apiKey: daytonaApiKey })
-
-  for (const id of sandboxIds) {
-    try {
-      const sandbox = await daytona.get(id)
-      await sandbox.delete()
-    } catch { /* best effort */ }
-  }
-
   try {
-    const repos = await prisma.repo.findMany({
-      where: { userId: E2E_USER_ID },
-      select: { id: true },
-    })
-    const repoIds = repos.map(r => r.id)
-
-    if (repoIds.length > 0) {
-      const branchIds = (await prisma.branch.findMany({
-        where: { repoId: { in: repoIds } },
-        select: { id: true },
-      })).map(b => b.id)
-
-      if (branchIds.length > 0) {
-        const messageIds = (await prisma.message.findMany({
-          where: { branchId: { in: branchIds } },
-          select: { id: true },
-        })).map(m => m.id)
-
-        if (messageIds.length > 0) {
-          await prisma.agentExecution.deleteMany({ where: { messageId: { in: messageIds } } })
-          await prisma.message.deleteMany({ where: { id: { in: messageIds } } })
-        }
-        await prisma.sandbox.deleteMany({ where: { branchId: { in: branchIds } } })
-        await prisma.branch.deleteMany({ where: { id: { in: branchIds } } })
-      }
-      await prisma.repo.deleteMany({ where: { id: { in: repoIds } } })
-    }
+    const daytona = new Daytona({ apiKey: daytonaApiKey })
+    await wipeE2eUserData(daytona)
   } catch (err) {
     console.error("[e2e/setup] Cleanup error:", err)
   }

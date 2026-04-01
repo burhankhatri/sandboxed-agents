@@ -96,6 +96,7 @@ These tests start a real Next.js dev server, a dedicated PostgreSQL database, re
 
 - `DAYTONA_API_KEY` in the environment (Playwright loads repo root `.env` via `playwright.config.ts`).
 - `packages/web/.env.e2e` with at least `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEXTAUTH_SECRET`, and `ENCRYPTION_KEY`. Use a database separate from your normal dev DB.
+- Optional: `E2E_CLAUDE_OAUTH_JSON` in `.env.e2e` — same JSON as Settings → Claude subscription (including `claudeAiOauth`). When set, `POST /api/e2e/setup` seeds the e2e user with Claude Max OAuth and uses agent `claude-code` instead of OpenCode so agent runs do not depend on OpenCode reachability.
 
 **Run** (from `packages/web`):
 

@@ -15,6 +15,7 @@ import { encode } from "next-auth/jwt"
 import { Daytona } from "@daytonaio/sdk"
 import { prisma } from "@/lib/db/prisma"
 import { PATHS } from "@/lib/shared/constants"
+import { encrypt } from "@/lib/auth/encryption"
 
 const E2E_USER_ID = "e2e-test-user"
 const E2E_USER = { name: "E2E Test", email: "e2e@test.local" }
@@ -98,6 +99,37 @@ async function wipeE2eUserData(daytona: Daytona) {
   await prisma.repo.deleteMany({ where: { id: { in: repoIds } } })
 }
 
+/**
+ * When `E2E_CLAUDE_OAUTH_JSON` is set (e.g. in `.env.e2e`), seed the e2e user with the same
+ * Claude Max OAuth blob used in Settings (JSON with `claudeAiOauth`, etc.). Enables real
+ * `claude-code` runs in Playwright without OpenCode.
+ */
+async function upsertE2eClaudeOAuthFromEnv() {
+  const raw = process.env.E2E_CLAUDE_OAUTH_JSON?.trim()
+  if (!raw) return
+
+  let normalized: string
+  try {
+    normalized = JSON.stringify(JSON.parse(raw))
+  } catch {
+    console.warn("[e2e/setup] E2E_CLAUDE_OAUTH_JSON is not valid JSON, skipping Claude credentials")
+    return
+  }
+
+  await prisma.userCredentials.upsert({
+    where: { userId: E2E_USER_ID },
+    create: {
+      userId: E2E_USER_ID,
+      anthropicAuthType: "claude-max",
+      anthropicAuthToken: encrypt(normalized),
+    },
+    update: {
+      anthropicAuthType: "claude-max",
+      anthropicAuthToken: encrypt(normalized),
+    },
+  })
+}
+
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === "production") {
     return Response.json({ error: "Not available in production" }, { status: 404 })
@@ -117,7 +149,10 @@ export async function POST(req: Request) {
     await ensureTestUser()
     const daytona = new Daytona({ apiKey: daytonaApiKey })
     await wipeE2eUserData(daytona)
+    await upsertE2eClaudeOAuthFromEnv()
     await setSessionCookie()
+
+    const e2eAgent = process.env.E2E_CLAUDE_OAUTH_JSON?.trim() ? "claude-code" : "opencode"
 
     // 2. Create Daytona sandboxes concurrently
     const sandboxes = await Promise.all(
@@ -175,7 +210,7 @@ export async function POST(req: Request) {
           name: `e2e-branch-${i}`,
           baseBranch: "main",
           status: "idle",
-          agent: "opencode",
+          agent: e2eAgent,
         },
       })
 

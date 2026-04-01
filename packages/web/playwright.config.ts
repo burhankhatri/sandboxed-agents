@@ -14,6 +14,30 @@ const port = 3001
 const e2eStreamDebug =
   process.env.PLAYWRIGHT_STREAM_DEBUG === "1" ? "NEXT_PUBLIC_E2E_STREAM_DEBUG=1" : ""
 
+const webServerEnv: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined)
+  ),
+  NEXT_DIST_DIR: ".next-e2e",
+  DATABASE_URL: testDbUrl,
+  DATABASE_URL_UNPOOLED: testDbUrl,
+  NEXTAUTH_URL: `http://localhost:${port}`,
+  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET!,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY!,
+  DAYTONA_API_KEY: process.env.DAYTONA_API_KEY!,
+  GITHUB_CLIENT_ID: "placeholder",
+  GITHUB_CLIENT_SECRET: "placeholder",
+}
+
+if (e2eStreamDebug) {
+  webServerEnv.NEXT_PUBLIC_E2E_STREAM_DEBUG = "1"
+}
+
+// Same JSON blob as Settings → Claude subscription; must use env (not shell) so quotes survive.
+if (process.env.E2E_CLAUDE_OAUTH_JSON?.trim()) {
+  webServerEnv.E2E_CLAUDE_OAUTH_JSON = process.env.E2E_CLAUDE_OAUTH_JSON
+}
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 5 * 60_000,
@@ -26,19 +50,8 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: {
-    command: [
-      `NEXT_DIST_DIR=.next-e2e`,
-      ...(e2eStreamDebug ? [e2eStreamDebug] : []),
-      `DATABASE_URL="${testDbUrl}"`,
-      `DATABASE_URL_UNPOOLED="${testDbUrl}"`,
-      `NEXTAUTH_URL="http://localhost:${port}"`,
-      `NEXTAUTH_SECRET="${process.env.NEXTAUTH_SECRET}"`,
-      `ENCRYPTION_KEY="${process.env.ENCRYPTION_KEY}"`,
-      `DAYTONA_API_KEY="${process.env.DAYTONA_API_KEY}"`,
-      `GITHUB_CLIENT_ID=placeholder`,
-      `GITHUB_CLIENT_SECRET=placeholder`,
-      `npx next dev --port ${port}`,
-    ].join(" "),
+    command: `npx next dev --port ${port}`,
+    env: webServerEnv,
     port,
     reuseExistingServer: false,
     timeout: 60_000,

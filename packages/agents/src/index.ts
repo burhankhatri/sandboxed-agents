@@ -106,6 +106,8 @@ export {
   getBackgroundSession,
   type SessionOptions,
   type CreateSessionOptions,
+  // Backwards-compatible alias
+  type CreateSessionOptions as BackgroundSessionOptions,
 } from "./session.js"
 
 // ─────────────────────────────────────────────────────────────────────────────

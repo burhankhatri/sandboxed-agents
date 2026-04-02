@@ -129,41 +129,49 @@ function FileIcon({ file, isLoading, onClick, isOpen, isPinned }: {
   // Adjust font size based on name length
   const nameSize = shortName.length <= 2 ? "text-[10px]" : shortName.length <= 3 ? "text-[9px]" : "text-[8px]"
 
+  const button = (
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className={cn(
+        "relative flex h-9 w-9 items-center justify-center rounded-md transition-all",
+        "bg-secondary hover:bg-accent",
+        isOpen && "ring-2 ring-primary bg-accent",
+        isPinned && "ring-2 ring-primary"
+      )}
+    >
+      <div className="flex flex-col items-center justify-center leading-none gap-0.5">
+        <span className={cn(nameSize, "font-semibold text-foreground font-mono")}>{shortName}</span>
+        <span className={cn("text-[7px] font-medium", extColor)}>{ext}</span>
+      </div>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-md">
+          <Loader2 className="h-3 w-3 animate-spin" />
+        </div>
+      )}
+      {/* Pin indicator */}
+      {isPinned && (
+        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
+      )}
+    </button>
+  )
+
+  // Don't show tooltip when popover is open
+  if (isOpen) {
+    return button
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClick()
-          }}
-          className={cn(
-            "relative flex h-9 w-9 items-center justify-center rounded-md transition-all",
-            "bg-secondary hover:bg-accent",
-            isOpen && "ring-2 ring-primary bg-accent",
-            isPinned && "ring-2 ring-primary"
-          )}
-        >
-          <div className="flex flex-col items-center justify-center leading-none gap-0.5">
-            <span className={cn(nameSize, "font-semibold text-foreground font-mono")}>{shortName}</span>
-            <span className={cn("text-[7px] font-medium", extColor)}>{ext}</span>
-          </div>
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-md">
-              <Loader2 className="h-3 w-3 animate-spin" />
-            </div>
-          )}
-          {/* Pin indicator */}
-          {isPinned && (
-            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
-          )}
-        </button>
+        {button}
       </TooltipTrigger>
       <TooltipContent side="left" className="max-w-xs">
         <p className="font-mono text-xs truncate">{filename}</p>
         <p className="text-[10px] text-muted-foreground">
           {formatRelativeTime(file.modifiedAt)}
-          {isPinned && " • Pinned"}
         </p>
       </TooltipContent>
     </Tooltip>

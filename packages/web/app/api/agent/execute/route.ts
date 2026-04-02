@@ -139,8 +139,14 @@ export async function POST(req: Request) {
       })
     }
 
-    const agentExecution = await prisma.agentExecution.create({
-      data: {
+    const agentExecution = await prisma.agentExecution.upsert({
+      where: { messageId },
+      update: {
+        sandboxId: daytonaSandboxId,
+        status: "running",
+        completedAt: null,
+      },
+      create: {
         messageId,
         sandboxId: daytonaSandboxId,
         status: "running",

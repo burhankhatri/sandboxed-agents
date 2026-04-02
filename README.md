@@ -198,34 +198,7 @@ For full local development setup (database, environment variables, running the d
 | `npm run lint` | ESLint check across all packages |
 | `npm run clean` | Clean build artifacts |
 
-### Package-Specific Commands
-
-```bash
-# SDK package (packages/agents)
-npm run build -w @sandboxed-agents/sdk
-npm run test -w @sandboxed-agents/sdk
-
-# Web package (packages/web)
-npm run dev -w @sandboxed-agents/web
-npm run build -w @sandboxed-agents/web
-```
-
-### SDK Development
-
-The SDK (`@sandboxed-agents/sdk`) is in `packages/agents/`. The web app depends on it via workspace reference.
-
-```bash
-# Build the SDK after making changes
-npm run build:sdk
-
-# Run SDK tests
-npm run test -w @sandboxed-agents/sdk
-
-# Run SDK tests with coverage
-cd packages/agents && npm run test:coverage
-```
-
-See [`packages/agents/README.md`](packages/agents/README.md) for full SDK documentation.
+For SDK development, see [`packages/agents/README.md`](packages/agents/README.md).
 
 ### Testing
 

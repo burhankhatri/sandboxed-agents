@@ -7,7 +7,7 @@ The current SDK has a **monolithic Provider base class** (815 LOC) that handles 
 This proposal introduces a **clean separation of concerns** through:
 1. A **declarative provider definition** system
 2. **Centralized tool normalization**
-3. **Extracted background session management**
+3. **Background-only execution** (remove synchronous mode)
 4. **Composable command building**
 5. **Pluggable provider registry**
 
@@ -15,10 +15,28 @@ This proposal introduces a **clean separation of concerns** through:
 
 ## Current Problems
 
+### 0. Dead Code: Synchronous Session Mode
+
+The SDK maintains two execution modes:
+- **Synchronous**: `createSession()` + `session.run()` - streams events directly
+- **Background**: `createBackgroundSession()` + `session.start()` + `session.getEvents()` - polls JSONL
+
+**Analysis of actual usage:**
+- `createSession()` is **only used in integration tests**
+- The web application **exclusively uses background sessions**
+- The README primarily documents background sessions
+- Synchronous mode adds ~100 LOC to the base class (`runSandbox`, `executeCommandStream`)
+
+**Recommendation: Remove synchronous mode entirely.**
+- Simplifies the Provider base class significantly
+- One execution model = one mental model
+- Tests can use background sessions (they already work)
+- Reduces API surface area
+
 ### 1. Monolithic Base Class (815 LOC)
 The `Provider` base class handles:
 - Lifecycle management (setup, ready promise)
-- Command execution
+- Command execution (both sync AND background - redundant)
 - Event parsing orchestration
 - Background session state machine (500+ LOC)
 - Process management (start, poll, kill)
@@ -529,131 +547,14 @@ class BackgroundSessionImpl implements BackgroundSession {
 
 ---
 
-## AgentRunner: The New "Provider"
+## Simplified Public API (Background-Only)
 
-### Composition Over Inheritance
-
-```typescript
-// core/agent-runner.ts
-
-import { AgentDefinition, ParseContext } from './agent.js'
-import { Event } from './events.js'
-import { CodeAgentSandbox } from '../types/provider.js'
-
-export interface AgentRunnerOptions {
-  agent: AgentDefinition
-  sandbox: CodeAgentSandbox
-  runDefaults?: RunDefaults
-}
-
-/**
- * Runs an agent definition against a sandbox.
- * This replaces the monolithic Provider base class.
- */
-export class AgentRunner {
-  private agent: AgentDefinition
-  private sandbox: CodeAgentSandbox
-  private runDefaults: RunDefaults
-  private parseContext: ParseContext = { state: {}, sessionId: null }
-  private readyPromise: Promise<void>
-
-  constructor(options: AgentRunnerOptions) {
-    this.agent = options.agent
-    this.sandbox = options.sandbox
-    this.runDefaults = options.runDefaults ?? {}
-
-    // Setup: install + agent-specific setup
-    this.readyPromise = this.setup()
-  }
-
-  get name(): string {
-    return this.agent.name
-  }
-
-  get sessionId(): string | null {
-    return this.parseContext.sessionId
-  }
-
-  get ready(): Promise<void> {
-    return this.readyPromise
-  }
-
-  private async setup(): Promise<void> {
-    await this.sandbox.ensureProvider(this.agent.name)
-
-    // Agent-specific setup (e.g., Codex login)
-    if (this.agent.capabilities?.setup) {
-      await this.agent.capabilities.setup(this.sandbox, this.runDefaults.env ?? {})
-    }
-  }
-
-  async *run(promptOrOptions: string | RunOptions = {}): AsyncGenerator<Event> {
-    await this.readyPromise
-
-    const options = this.mergeOptions(promptOrOptions)
-    const commandSpec = this.agent.buildCommand(options)
-    const fullCommand = this.buildFullCommand(commandSpec)
-
-    for await (const line of this.sandbox.executeCommandStream(fullCommand)) {
-      const events = this.parseLines(line)
-      for (const event of events) {
-        if (event.type === 'session') {
-          this.parseContext.sessionId = event.id
-        }
-        yield event
-      }
-    }
-  }
-
-  private parseLines(line: string): Event[] {
-    const result = this.agent.parse(line, this.parseContext)
-    if (result === null) return []
-    return Array.isArray(result) ? result : [result]
-  }
-
-  private mergeOptions(promptOrOptions: string | RunOptions): RunOptions {
-    if (typeof promptOrOptions === 'string') {
-      return { ...this.runDefaults, prompt: promptOrOptions }
-    }
-
-    // Handle system prompt for agents without native support
-    const options = { ...this.runDefaults, ...promptOrOptions }
-    if (options.systemPrompt && !this.agent.capabilities?.supportsSystemPrompt) {
-      options.prompt = options.systemPrompt + '\n\n' + (options.prompt ?? '')
-    }
-
-    return options
-  }
-
-  private buildFullCommand(spec: CommandSpec): string {
-    const quotedArgs = spec.args.map(arg => this.quoteArg(arg))
-    const command = [spec.cmd, ...quotedArgs].join(' ')
-
-    if (spec.wrapInBash) {
-      return `bash -lc ${this.quoteArg(command)}`
-    }
-    return command
-  }
-
-  private quoteArg(arg: string): string {
-    if (arg.includes(' ') || arg.includes('"') || arg.includes("'")) {
-      return `'${arg.replace(/'/g, "'\\''")}'`
-    }
-    return arg
-  }
-}
-```
-
----
-
-## Updated Public API
-
-### Clean Session Creation
+With synchronous mode removed, the API becomes much simpler:
 
 ```typescript
-// session.ts
+// session.ts - The ONLY public API
 
-import { AgentRunner, AgentRunnerOptions } from './core/agent-runner.js'
+import { BackgroundSession, createBackgroundSessionImpl } from './background/session-manager.js'
 import { createAgent } from './core/registry.js'
 import { adaptSandbox } from './sandbox/index.js'
 
@@ -664,43 +565,112 @@ export interface SessionOptions {
   timeout?: number
   systemPrompt?: string
   env?: Record<string, string>
-  skipInstall?: boolean
 }
 
 /**
- * Create a session with an agent.
+ * Create a background session with an agent.
+ * This is the ONLY way to run agents - simple and consistent.
  *
  * @example
  * const session = await createSession('claude', { sandbox, env: { ANTHROPIC_API_KEY: '...' } })
- * for await (const event of session.run('Hello!')) {
- *   console.log(event)
- * }
+ * await session.start('Hello!')
+ * const result = await session.poll()
  */
 export async function createSession(
   agentName: string,
   options: SessionOptions
-): Promise<AgentRunner> {
+): Promise<BackgroundSession> {
   const agent = createAgent(agentName)
   const sandbox = adaptSandbox(options.sandbox)
+  const sessionId = options.sessionId ?? randomUUID()
+  const sessionDir = `/tmp/codeagent-${sessionId}`
 
-  const runner = new AgentRunner({
-    agent,
-    sandbox,
-    runDefaults: {
-      model: options.model,
-      sessionId: options.sessionId,
-      timeout: options.timeout,
-      systemPrompt: options.systemPrompt,
-      env: options.env,
-    },
-  })
-
-  if (!options.skipInstall) {
-    await runner.ready
+  // Run agent-specific setup
+  await sandbox.ensureProvider(agent.name)
+  if (agent.capabilities?.setup) {
+    await agent.capabilities.setup(sandbox, options.env ?? {})
   }
 
-  return runner
+  return createBackgroundSessionImpl(agent, sandbox, sessionDir, {
+    model: options.model,
+    timeout: options.timeout,
+    systemPrompt: options.systemPrompt,
+    env: options.env,
+  })
 }
+
+/**
+ * Reattach to an existing session by ID.
+ */
+export async function getSession(
+  sessionId: string,
+  options: Omit<SessionOptions, 'sessionId'>
+): Promise<BackgroundSession> {
+  const sessionDir = `/tmp/codeagent-${sessionId}`
+  const meta = await readMetaFromSandbox(options.sandbox, sessionDir)
+
+  if (!meta?.provider) {
+    throw new Error('Session not found or has no provider metadata')
+  }
+
+  const agent = createAgent(meta.provider)
+  const sandbox = adaptSandbox(options.sandbox)
+
+  return createBackgroundSessionImpl(agent, sandbox, sessionDir, {
+    model: options.model,
+    timeout: options.timeout,
+    systemPrompt: options.systemPrompt,
+    env: options.env,
+  })
+}
+```
+
+### What We Remove
+
+By going background-only, we can delete:
+
+1. **`executeCommandStream`** from `CodeAgentSandbox` interface - not needed
+2. **`runSandbox()`** method in Provider base - sync execution path
+3. **`run()` async generator** - no streaming, just polling
+4. **`collectEvents()`, `collectText()`, `runWithCallback()`** - convenience wrappers for sync mode
+5. **3-layer env var precedence** - simplify to session env only
+
+### The BackgroundSession Interface (Simplified)
+
+```typescript
+// background/session-manager.ts
+
+export interface BackgroundSession {
+  readonly id: string
+  readonly agent: AgentDefinition
+
+  /** Start a turn with the given prompt */
+  start(prompt: string, options?: { env?: Record<string, string> }): Promise<TurnHandle>
+
+  /** Poll for new events */
+  poll(): Promise<PollResult>
+
+  /** Cancel the current turn */
+  cancel(): Promise<void>
+
+  /** Check if a turn is currently running */
+  isRunning(): Promise<boolean>
+}
+
+export interface TurnHandle {
+  executionId: string
+  pid: number
+  outputFile: string
+}
+
+export interface PollResult {
+  sessionId: string | null
+  events: Event[]
+  cursor: string
+  running: boolean
+  runPhase: 'idle' | 'starting' | 'running' | 'stopped'
+}
+```
 ```
 
 ---
@@ -731,21 +701,25 @@ export async function createSession(
 | Aspect | Current State |
 |--------|--------------|
 | Adding new agent | 8+ files to modify |
+| Execution modes | 2 (sync + background) - confusing |
 | Tool mappings | Duplicated in 4+ places |
 | Base class | 815 LOC monolith |
 | Testing parsers | Requires full provider instance |
 | Provider-specific logic | Scattered in base class |
 | Background sessions | Tightly coupled to provider |
+| Sandbox interface | 10+ methods, many optional |
 
 ### After (Proposed)
 | Aspect | New State |
 |--------|-----------|
 | Adding new agent | 1 file (agent definition) + register |
+| Execution modes | 1 (background only) - simple |
 | Tool mappings | Colocated with agent, centralized normalization |
-| Core classes | ~100 LOC AgentRunner + composable modules |
+| Core classes | ~200 LOC BackgroundSession + composable modules |
 | Testing parsers | Pure functions, no instantiation needed |
 | Provider-specific logic | In agent's `capabilities` |
 | Background sessions | Separate, reusable module |
+| Sandbox interface | 5 methods, all required |
 
 ---
 

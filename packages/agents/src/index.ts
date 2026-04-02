@@ -101,7 +101,7 @@ export {
   createSession,
   getSession,
   getAgentNames,
-  // Legacy aliases
+  // Legacy aliases for backwards compatibility
   createBackgroundSession,
   getBackgroundSession,
   type SessionOptions,
@@ -157,47 +157,3 @@ export {
 
 // Debug (enable with CODING_AGENTS_DEBUG=1)
 export { isDebugEnabled, debugLog } from "./debug.js"
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Legacy Exports (Deprecated - for backwards compatibility)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// These are deprecated and will be removed in a future version.
-// Use createSession() and getSession() instead.
-
-/** @deprecated Use AgentDefinition instead */
-export type { IProvider } from "./types/provider.js"
-
-/** @deprecated Use createSession() instead */
-export type {
-  ProviderName,
-  ProviderCommand,
-  RunDefaults,
-  ProviderOptions,
-} from "./types/provider.js"
-
-import { registry as _registry, getAgentNames as _getAgentNames } from "./core/registry.js"
-
-/** @deprecated Use getAgentNames() instead */
-export function getProviderNames(): string[] {
-  return _getAgentNames()
-}
-
-/** @deprecated Use registry.has() instead */
-export function isValidProvider(name: string): boolean {
-  return _registry.has(name)
-}
-
-// Legacy provider exports (for backwards compatibility with tests)
-// These will be removed in a future version.
-/** @deprecated Use createSession() with agent name instead */
-export {
-  Provider,
-  ClaudeProvider,
-  CodexProvider,
-  GeminiProvider,
-  OpenCodeProvider,
-} from "./providers/index.js"
-
-/** @deprecated Use createSession() instead */
-export { createProvider } from "./factory.js"

@@ -91,28 +91,40 @@ const providers: ProviderConfig[] = [
   },
 ]
 
-// Helper to poll for completion
-async function pollUntilEnd(
+// Helper to poll for completion and return raw output
+async function pollUntilEndWithRaw(
   bg: Awaited<ReturnType<typeof createBackgroundSession>>,
+  sandbox: Sandbox,
+  outputFile: string,
   timeoutMs = 180_000,
   pollIntervalMs = 2000
-): Promise<Event[]> {
+): Promise<{ events: Event[]; rawOutput: string }> {
   const deadline = Date.now() + timeoutMs
   let allEvents: Event[] = []
+  let rawOutput = ""
 
   while (Date.now() < deadline) {
-    const { events } = await bg.getEvents()
+    const { events, running } = await bg.getEvents()
     allEvents = events
-    if (events.some((e) => e.type === "end" || e.type === "agent_crashed")) break
+
+    // Fetch raw output on each poll - note: Daytona SDK uses .result not .output
+    const result = await sandbox.process.executeCommand(`cat "${outputFile}" 2>/dev/null || echo ""`)
+    rawOutput = result.result ?? ""
+
+    if (process.env.DEBUG) {
+      console.log(`    Poll: ${events.length} events, running=${running}, rawOutput=${rawOutput.length} bytes`)
+    }
+
+    if (events.some((e) => e.type === "end" || e.type === "agent_crashed")) {
+      // Give a moment for final writes
+      await new Promise((r) => setTimeout(r, 1000))
+      const finalResult = await sandbox.process.executeCommand(`cat "${outputFile}" 2>/dev/null || echo ""`)
+      rawOutput = finalResult.result ?? ""
+      break
+    }
     await new Promise((r) => setTimeout(r, pollIntervalMs))
   }
-  return allEvents
-}
-
-// Fetch raw JSONL content from sandbox
-async function getRawJsonl(sandbox: Sandbox, outputFile: string): Promise<string> {
-  const result = await sandbox.process.executeCommand(`cat ${outputFile}`)
-  return result.output ?? ""
+  return { events: allEvents, rawOutput }
 }
 
 async function generateReferenceForProvider(
@@ -149,14 +161,13 @@ async function generateReferenceForProvider(
     const startResult = await bg.start(TEST_PROMPT)
     console.log(`  PID: ${startResult.pid}, Output file: ${startResult.outputFile}`)
 
-    // Wait for completion
+    // Wait for completion and get raw output
     console.log(`  Waiting for completion...`)
-    const events = await pollUntilEnd(bg)
+    const { events, rawOutput } = await pollUntilEndWithRaw(bg, sandbox, startResult.outputFile)
     console.log(`  Received ${events.length} events`)
 
-    // Fetch raw JSONL
-    console.log(`  Fetching raw JSONL output...`)
-    const rawJsonl = await getRawJsonl(sandbox, startResult.outputFile)
+    // Use the raw output we captured
+    const rawJsonl = rawOutput
 
     // Write to file
     const outputPath = join(FIXTURES_DIR, `${config.name}.jsonl`)

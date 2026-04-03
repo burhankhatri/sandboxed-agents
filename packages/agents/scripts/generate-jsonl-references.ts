@@ -12,8 +12,11 @@
  *   export OPENAI_API_KEY=...     # for codex
  *   export GEMINI_API_KEY=...     # for gemini
  *
- *   # Run the script
+ *   # Run for all providers (skips those without API keys)
  *   npx tsx scripts/generate-jsonl-references.ts
+ *
+ *   # Run for a single provider
+ *   npx tsx scripts/generate-jsonl-references.ts gemini
  *
  * Output:
  *   tests/fixtures/jsonl-reference/
@@ -199,6 +202,19 @@ async function main() {
   console.log(`Output directory: ${FIXTURES_DIR}`)
   console.log()
 
+  // Check for CLI argument to filter to a single provider
+  const filterProvider = process.argv[2] as ProviderName | undefined
+  if (filterProvider) {
+    const valid = providers.some((p) => p.name === filterProvider)
+    if (!valid) {
+      console.error(`Unknown provider: ${filterProvider}`)
+      console.error(`Valid providers: ${providers.map((p) => p.name).join(", ")}`)
+      process.exit(1)
+    }
+    console.log(`Filtering to provider: ${filterProvider}`)
+    console.log()
+  }
+
   // Show which providers will be tested
   console.log("Provider availability:")
   for (const p of providers) {
@@ -208,6 +224,9 @@ async function main() {
   const daytona = new Daytona({ apiKey: DAYTONA_API_KEY! })
 
   for (const config of providers) {
+    if (filterProvider && config.name !== filterProvider) {
+      continue
+    }
     await generateReferenceForProvider(daytona, config)
   }
 

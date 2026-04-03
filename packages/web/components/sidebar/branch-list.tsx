@@ -69,6 +69,15 @@ export function BranchList({
   const [baseBranchOpen, setBaseBranchOpen] = useState(false)
   const [branchSearch, setBranchSearch] = useState("")
   const [newBranchBase, setNewBranchBase] = useState(repo.preferredBaseBranch || repo.defaultBranch || "main")
+  // Sync base branch when repo data changes (e.g. after preferredBaseBranch is persisted and reloaded)
+  const effectiveBase = repo.preferredBaseBranch || repo.defaultBranch || "main"
+  const prevEffectiveBaseRef = useRef(effectiveBase)
+  useEffect(() => {
+    if (effectiveBase !== prevEffectiveBaseRef.current) {
+      setNewBranchBase(effectiveBase)
+      prevEffectiveBaseRef.current = effectiveBase
+    }
+  }, [effectiveBase])
   const [createError, setCreateError] = useState<string | null>(null)
   const [startCommit, setStartCommit] = useState<string | null>(null)
   const [githubBranches, setGithubBranches] = useState<string[]>([])

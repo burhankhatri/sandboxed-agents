@@ -19,6 +19,7 @@ export async function GET() {
         owner: true,
         avatar: true,
         defaultBranch: true,
+        preferredBaseBranch: true,
         branches: {
           select: {
             id: true,

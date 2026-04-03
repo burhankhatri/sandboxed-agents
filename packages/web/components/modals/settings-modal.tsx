@@ -1,12 +1,12 @@
 "use client"
 
 import { cn } from "@/lib/shared/utils"
-import { X, Terminal, Copy, Check, Loader2, Clock, Bot, Box, Key, ExternalLink, AlertTriangle, Trash2, Sun, Moon, Monitor } from "lucide-react"
+import { X, Terminal, Copy, Check, Loader2, Clock, Bot, Box, Key, ExternalLink, AlertTriangle, Trash2, Sun, Moon, Monitor, GitBranch } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { Input } from "@/components/ui/input"
 
-type SettingsTab = "agents" | "sandboxes" | "appearance"
+type SettingsTab = "agents" | "sandboxes" | "git" | "appearance"
 
 interface SettingsModalProps {
   open: boolean
@@ -329,6 +329,18 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
           >
             <Box className="h-3.5 w-3.5" />
             Sandboxes
+          </button>
+          <button
+            onClick={() => setActiveTab("git")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors cursor-pointer border-b-2 -mb-px",
+              activeTab === "git"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+            Git
           </button>
           <button
             onClick={() => setActiveTab("appearance")}
@@ -679,41 +691,8 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
             </>
           )}
 
-          {activeTab === "appearance" && (
+          {activeTab === "git" && (
             <>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-foreground">Theme</label>
-                <p className="text-[11px] text-muted-foreground">
-                  Choose how the app looks. System will match your OS preference.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {([
-                  { value: "system", label: "System", icon: Monitor },
-                  { value: "light", label: "Light", icon: Sun },
-                  { value: "dark", label: "Dark", icon: Moon },
-                ] as const).map(({ value, label, icon: Icon }) => (
-                  <button
-                    key={value}
-                    onClick={() => setTheme(value)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
-                      theme === value
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/20"
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Git Preferences */}
-              <div className="flex flex-col gap-1.5 pt-3 border-t border-border">
-                <label className="text-xs font-medium text-foreground">Git</label>
-              </div>
-
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs font-medium text-foreground">Squash on merge</span>
@@ -755,6 +734,40 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
                     </button>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "appearance" && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-foreground">Theme</label>
+                <p className="text-[11px] text-muted-foreground">
+                  Choose how the app looks. System will match your OS preference.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {([
+                  { value: "system", label: "System", icon: Monitor },
+                  { value: "light", label: "Light", icon: Sun },
+                  { value: "dark", label: "Dark", icon: Moon },
+                ] as const).map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+                      theme === value
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/20"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               </div>
             </>
           )}

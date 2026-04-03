@@ -74,6 +74,11 @@ export function useGitDialogs({
   const [mergeDirection, setMergeDirection] = useState<"into-current" | "from-current">("from-current")
   const [squashMerge, setSquashMerge] = useState(defaultSquashOnMerge)
 
+  // Reset squash default when merge dialog opens
+  useEffect(() => {
+    if (mergeOpen) setSquashMerge(defaultSquashOnMerge)
+  }, [mergeOpen, defaultSquashOnMerge])
+
   // Tag-specific state
   const [tagNameInput, setTagNameInput] = useState("")
 

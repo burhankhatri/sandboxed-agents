@@ -152,6 +152,7 @@ export async function POST(req: Request) {
         }
 
         const safePath = escapeShell(filePath)
+        const maxLines = typeof body.maxLines === "number" ? body.maxLines : undefined
 
         // Get file metadata first
         const statResult = await sandbox.process.executeCommand(
@@ -166,8 +167,8 @@ export async function POST(req: Request) {
         const mtime = parseInt(parts[0], 10)
         const size = parseInt(parts[1], 10)
 
-        // Limit file size to 500KB
-        if (size > 500 * 1024) {
+        // Limit file size to 500KB (skip for preview requests)
+        if (!maxLines && size > 500 * 1024) {
           return Response.json({
             error: "File too large",
             path: filePath,
@@ -176,16 +177,18 @@ export async function POST(req: Request) {
           }, { status: 413 })
         }
 
-        // Read the file content
-        const readResult = await sandbox.process.executeCommand(
-          `cat '${safePath}' 2>/dev/null`
-        )
+        // Read file content (partial with head, or full with cat)
+        const readCmd = maxLines
+          ? `head -n ${maxLines} '${safePath}' 2>/dev/null`
+          : `cat '${safePath}' 2>/dev/null`
+        const readResult = await sandbox.process.executeCommand(readCmd)
 
         return Response.json({
           path: filePath,
           content: readResult.result || "",
           modifiedAt: mtime * 1000,
           size,
+          truncated: !!maxLines,
         })
       }
 

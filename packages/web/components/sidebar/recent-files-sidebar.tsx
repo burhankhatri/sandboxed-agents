@@ -21,7 +21,10 @@ interface FileContent {
   content: string
   modifiedAt: number
   size: number
+  truncated?: boolean
 }
+
+const PREVIEW_LINES = 30
 
 interface DevServer {
   port: number
@@ -127,13 +130,44 @@ function formatRelativeTime(timestamp: number): string {
   return `${Math.floor(minutes / 60)}h ago`
 }
 
+function highlightLines(code: string): string[] {
+  return highlight(code).split("\n")
+}
+
 function HighlightedCode({ code }: { code: string }) {
+  const lineCount = code.split("\n").length
+
+  // Small files: render synchronously (no spinner flash)
+  if (lineCount <= 100) {
+    const lines = highlightLines(code)
+    return (
+      <table className="w-full text-xs font-mono border-collapse">
+        <tbody>
+          {lines.map((lineHtml, i) => (
+            <tr key={i} className="leading-5">
+              <td className="select-none text-right text-muted-foreground/50 pr-3 pl-3 align-top w-1 whitespace-nowrap">{i + 1}</td>
+              <td
+                className="pr-3 whitespace-pre-wrap break-all"
+                dangerouslySetInnerHTML={{ __html: lineHtml }}
+              />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  // Large files: defer to avoid blocking UI
+  return <DeferredHighlightedCode code={code} />
+}
+
+function DeferredHighlightedCode({ code }: { code: string }) {
   const [lines, setLines] = useState<string[] | null>(null)
 
   useEffect(() => {
     setLines(null)
     const id = requestAnimationFrame(() => {
-      setLines(highlight(code).split("\n"))
+      setLines(highlightLines(code))
     })
     return () => cancelAnimationFrame(id)
   }, [code])
@@ -216,6 +250,7 @@ function FilePreviewPopover({
   onOpenChange,
   onMouseEnter,
   onMouseLeave,
+  onLoadFull,
   children,
 }: {
   file: ModifiedFile
@@ -226,9 +261,20 @@ function FilePreviewPopover({
   onOpenChange: (open: boolean) => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
+  onLoadFull?: () => void
   children: React.ReactNode
 }) {
   const { filename } = getFileDisplayInfo(file.path)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Load full content when user scrolls near the bottom of a truncated preview
+  const handleScroll = useCallback(() => {
+    if (!content?.truncated || !scrollRef.current || !onLoadFull) return
+    const el = scrollRef.current
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+      onLoadFull()
+    }
+  }, [content?.truncated, onLoadFull])
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -254,7 +300,7 @@ function FilePreviewPopover({
         </div>
 
         {/* Content */}
-        <div className="overflow-auto min-h-0 flex-1">
+        <div ref={scrollRef} className="overflow-auto min-h-0 flex-1" onScroll={handleScroll}>
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -264,7 +310,15 @@ function FilePreviewPopover({
               {error}
             </div>
           ) : content ? (
-            <HighlightedCode code={content.content} />
+            <>
+              <HighlightedCode code={content.content} />
+              {content.truncated && (
+                <div className="flex items-center justify-center py-2 text-[10px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                  Loading full file…
+                </div>
+              )}
+            </>
           ) : null}
         </div>
 
@@ -744,18 +798,24 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
     }
   }, [sandboxId, repoPath, propPreviewUrlPattern])
 
-  // Fetch file content
-  const fetchFileContent = useCallback(async (filePath: string) => {
+  // Fetch file content (preview = first N lines, full = entire file)
+  const fetchFileContent = useCallback(async (filePath: string, preview = false) => {
     if (!sandboxId || !repoPath) return
 
-    // Check cache first
+    // Check cache first — if we have full content cached, always use it
     const cached = contentCache.get(filePath)
     if (cached && Date.now() - cached.timestamp < CONTENT_CACHE_TTL) {
-      setFileContents((prev) => new Map(prev).set(filePath, cached.content))
-      return
+      // If requesting full but cache is truncated, refetch
+      if (!preview || !cached.content.truncated) {
+        setFileContents((prev) => new Map(prev).set(filePath, cached.content))
+        return
+      }
     }
 
-    setLoadingContent(filePath)
+    // For preview requests, don't show loading spinner — it should feel instant
+    if (!preview) {
+      setLoadingContent(filePath)
+    }
     setContentError(null)
 
     try {
@@ -767,13 +827,17 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
           repoPath,
           action: "read-file",
           filePath,
+          ...(preview ? { maxLines: PREVIEW_LINES } : {}),
         }),
       })
 
       if (res.ok) {
         const data = await res.json()
         setFileContents((prev) => new Map(prev).set(filePath, data))
-        contentCache.set(filePath, { content: data, timestamp: Date.now() })
+        // Only cache full reads (not previews) in the long-lived cache
+        if (!preview) {
+          contentCache.set(filePath, { content: data, timestamp: Date.now() })
+        }
       } else if (res.status === 413) {
         setContentError("File too large to preview")
       } else {
@@ -850,8 +914,16 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
       setPinnedFileIndex(null)
     } else {
       setPinnedFileIndex(index)
+      // Fetch full content when pinning
+      const file = files[index]
+      if (file) {
+        const cached = fileContents.get(file.path)
+        if (!cached || cached.truncated) {
+          fetchFileContent(file.path, false)
+        }
+      }
     }
-  }, [pinnedFileIndex])
+  }, [pinnedFileIndex, files, fileContents, fetchFileContent])
 
   const handleFileMouseEnter = useCallback((index: number, file: ModifiedFile) => {
     if (hoverTimeoutRef.current) {
@@ -861,7 +933,7 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
     if (pinnedFileIndex !== null) return
     setHoveredFileIndex(index)
     if (!fileContents.has(file.path)) {
-      fetchFileContent(file.path)
+      fetchFileContent(file.path, true)
     }
   }, [pinnedFileIndex, fileContents, fetchFileContent])
 
@@ -994,7 +1066,11 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
         const isPinned = pinnedFileIndex === index
         const isHovered = hoveredFileIndex === index
         const isOpen = isPinned || isHovered
-        const content = fileContents.get(file.path) || null
+        const fullContent = fileContents.get(file.path) || null
+        // On hover (not pinned), only render a preview to keep it snappy
+        const content = fullContent && !isPinned && !fullContent.truncated
+          ? { ...fullContent, content: fullContent.content.split("\n").slice(0, PREVIEW_LINES).join("\n"), truncated: true }
+          : fullContent
         const isLoadingThis = loadingContent === file.path
 
         return (
@@ -1008,6 +1084,7 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
             onOpenChange={(open) => handleFileOpenChange(index, open)}
             onMouseEnter={handleFilePopoverMouseEnter}
             onMouseLeave={handleFileMouseLeave}
+            onLoadFull={() => fetchFileContent(file.path, false)}
           >
             <div
               onMouseEnter={() => handleFileMouseEnter(index, file)}

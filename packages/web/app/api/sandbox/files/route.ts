@@ -183,12 +183,16 @@ export async function POST(req: Request) {
           : `cat '${safePath}' 2>/dev/null`
         const readResult = await sandbox.process.executeCommand(readCmd)
 
+        const content = readResult.result || ""
+        // Only mark as truncated if we actually cut lines off
+        const actuallyTruncated = !!maxLines && content.split("\n").length >= maxLines
+
         return Response.json({
           path: filePath,
-          content: readResult.result || "",
+          content,
           modifiedAt: mtime * 1000,
           size,
-          truncated: !!maxLines,
+          truncated: actuallyTruncated,
         })
       }
 

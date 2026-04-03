@@ -1062,7 +1062,9 @@ export function RecentFilesSidebar({ sandboxId, repoPath, cacheKey, previewUrlPa
         const isOpen = isPinned || isHovered
         const fullContent = fileContents.get(file.path) || null
         // On hover (not pinned/expanded), only render a preview to keep it snappy
-        const content = fullContent && !isPinned && !expandedFiles.has(file.path) && !fullContent.truncated
+        const needsTruncation = fullContent && !isPinned && !expandedFiles.has(file.path) && !fullContent.truncated
+          && fullContent.content.split("\n").length > PREVIEW_LINES
+        const content = needsTruncation
           ? { ...fullContent, content: fullContent.content.split("\n").slice(0, PREVIEW_LINES).join("\n"), truncated: true }
           : fullContent
         return (

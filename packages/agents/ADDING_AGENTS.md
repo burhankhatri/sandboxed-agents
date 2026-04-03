@@ -4,42 +4,39 @@
 
 ### 1. Read the CLI documentation
 
-Understand installation, authentication, and output format. Key questions:
+Understand installation method, auth env vars, JSON output flags, non-interactive/yolo flags, model selection flags, session resume flags.
 
-- How do I run a prompt non-interactively?
-- How do I get structured (JSON/JSONL) output?
-- How do I skip permission prompts for autonomous execution?
-- How do I specify a model and resume a session?
+### 2. Create agent module with `buildCommand` only
 
-### 2. Create a minimal agent module
+Create `src/agents/<provider>/`:
 
-Create `src/agents/<provider>/` with:
-
-- `index.ts` — Agent definition (install command, CLI flags)
-- `parser.ts` — Output parser (skeleton initially)
-- `tools.ts` — Tool name mappings
+- `index.ts` — Implement `buildCommand()` returning CLI command and flags. Set `parse()` to just `return null`
+- `parser.ts` — Empty or stub, not used yet
+- `tools.ts` — Export empty object `{}`
 
 Export from `src/agents/index.ts`.
 
-### 3. Generate reference JSONL
-
-Capture real CLI output to `tests/fixtures/jsonl-reference/<provider>.jsonl`:
+### 3. Run the script to generate reference JSONL
 
 ```bash
 DAYTONA_API_KEY=... <PROVIDER>_API_KEY=... npx tsx scripts/generate-jsonl-references.ts <provider>
 ```
 
+Output: `tests/fixtures/jsonl-reference/<provider>.jsonl`
+
 ### 4. Build parser and unit tests
 
-**Exploration phase (tandem):** Work iteratively — examine output, write a test, implement parsing, repeat. You're discovering the format.
+Examine the JSONL to understand event structure.
 
-**Hardening phase (test-first):** Once you understand the format, write tests first for edge cases (malformed JSON, missing fields, errors).
+**Exploration phase (tandem):** Iteratively add parsing logic to `parser.ts` and tests to `tests/parsers.test.ts`. You're discovering the format.
 
-Add tests to `tests/parsers.test.ts`.
+**Hardening phase (test-first):** Write tests first for edge cases (malformed JSON, missing fields, errors).
+
+Update `tools.ts` with tool name mappings.
 
 ### 5. Integration tests
 
-Test end-to-end in a Daytona sandbox. Add to `tests/integration/`.
+Add `tests/integration/<provider>.test.ts`.
 
 ```bash
 DAYTONA_API_KEY=... <PROVIDER>_API_KEY=... npm test -- tests/integration/<provider>.test.ts

@@ -33,7 +33,12 @@ type ClearableKey = "anthropicApiKey" | "anthropicAuthToken" | "openaiApiKey" | 
 
 export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate, highlightField, onClearHighlight }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("agents")
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme: setThemeRaw } = useTheme()
+  const setTheme = (value: string) => {
+    document.documentElement.classList.add("transitioning")
+    setThemeRaw(value)
+    setTimeout(() => document.documentElement.classList.remove("transitioning"), 350)
+  }
 
   // Anthropic credentials (separate API key and subscription)
   const [anthropicApiKey, setAnthropicApiKey] = useState("")
@@ -680,13 +685,13 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
                     key={value}
                     onClick={() => setTheme(value)}
                     className={cn(
-                      "flex flex-1 flex-col items-center gap-2 rounded-lg border px-4 py-3 text-xs font-medium transition-colors cursor-pointer",
+                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
                       theme === value
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-secondary text-muted-foreground hover:text-foreground hover:border-foreground/20"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/20"
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-3.5 w-3.5" />
                     {label}
                   </button>
                 ))}

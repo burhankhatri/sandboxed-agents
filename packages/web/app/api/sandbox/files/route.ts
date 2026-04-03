@@ -19,41 +19,32 @@ function escapeShell(str: string): string {
   return str.replace(/'/g, "'\\''")
 }
 
-/** Default file extensions to watch */
-const DEFAULT_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".json", ".py", ".go", ".rs", ".md", ".css", ".html", ".txt", ".log"]
+/** File extensions to look for in logs directory */
+const LOG_EXTENSIONS = [".log", ".txt", ".json"]
 
-/** Default patterns to ignore */
-const DEFAULT_IGNORE = ["node_modules", ".git", "dist", "build", ".next", "__pycache__", ".venv", "vendor"]
+/** Directories to ignore when searching for modified files */
+const IGNORE_DIRS = ["node_modules", ".git", "dist", "build", ".next", "__pycache__", ".venv", "vendor"]
 
 /**
- * Build the find command to locate files modified AFTER the clone completed.
- * We get the .git directory timestamp, add a small buffer, and find files
- * modified after that time.
+ * Build find command to locate files modified after a marker file.
+ * Uses -newer to compare against the marker file timestamp.
  */
-function buildFindCommandSinceClone(
-  path: string,
-  extensions: string[],
-  ignore: string[],
-  cloneTimestamp: number // Unix timestamp in seconds
+function buildFindCommandNewerThan(
+  repoPath: string,
+  markerFile: string,
+  ignoreDirs: string[]
 ): string {
-  const safePath = escapeShell(path)
+  const safePath = escapeShell(repoPath)
+  const safeMarker = escapeShell(markerFile)
 
   // Build ignore patterns for find -prune
-  const ignoreArgs = ignore
-    .map((pattern) => `-name '${escapeShell(pattern)}' -prune`)
+  const ignoreArgs = ignoreDirs
+    .map((dir) => `-name '${escapeShell(dir)}' -prune`)
     .join(" -o ")
 
-  // Build extension match patterns
-  const extPatterns = extensions
-    .map((ext) => `-name '*${escapeShell(ext)}'`)
-    .join(" -o ")
-
-  // Add 2 second buffer after clone time to exclude files created during clone
-  const afterTimestamp = cloneTimestamp + 2
-
-  // Use -newermt with a timestamp to find files modified after clone completed
-  // Output: path|mtime|size (using stat for metadata)
-  const command = `find '${safePath}' \\( ${ignoreArgs} \\) -o -type f \\( ${extPatterns} \\) -newermt "@${afterTimestamp}" -print0 2>/dev/null | xargs -0 -r stat --format='%n|%Y|%s' 2>/dev/null | head -20 || true`
+  // Find files newer than marker, excluding ignored directories
+  // The -newer flag compares mtime against the marker file
+  const command = `find '${safePath}' \\( ${ignoreArgs} \\) -o -type f -newer '${safeMarker}' -print0 2>/dev/null | xargs -0 -r stat --format='%n|%Y|%s' 2>/dev/null | head -20 || true`
 
   return command
 }
@@ -137,33 +128,14 @@ export async function POST(req: Request) {
 
     switch (action) {
       case "list-modified": {
-        // First, get the .git directory creation time (when the repo was cloned)
-        const safePath = escapeShell(repoPath)
-        // Use birth time (%W) so the baseline doesn't shift on every git commit.
-        // Fall back to mtime (%Y) if birth time is unavailable (returns 0 or -).
-        const gitStatResult = await sandbox.process.executeCommand(
-          `stat --format='%W' '${safePath}/.git' 2>/dev/null || echo '0'`
-        )
-        let cloneTimestamp = parseInt(gitStatResult.result?.trim() || "0", 10)
-
-        // Birth time unavailable — fall back to mtime of .git/config (stable across commits)
-        if (cloneTimestamp <= 0) {
-          const fallbackResult = await sandbox.process.executeCommand(
-            `stat --format='%Y' '${safePath}/.git/config' 2>/dev/null || echo '0'`
-          )
-          cloneTimestamp = parseInt(fallbackResult.result?.trim() || "0", 10)
-        }
-
-        let repoFiles: Array<{ path: string; modifiedAt: number; size: number }> = []
-        if (cloneTimestamp !== 0) {
-          // Get files modified AFTER the clone completed (with buffer)
-          const command = buildFindCommandSinceClone(repoPath, DEFAULT_EXTENSIONS, DEFAULT_IGNORE, cloneTimestamp)
-          const result = await sandbox.process.executeCommand(command, undefined, undefined, 30)
-          repoFiles = parseStatOutput(result.result || "")
-        }
+        // Find files modified after the clone marker file
+        // This marker is created right after git clone completes
+        const repoCommand = buildFindCommandNewerThan(repoPath, PATHS.CLONE_MARKER_FILE, IGNORE_DIRS)
+        const repoResult = await sandbox.process.executeCommand(repoCommand, undefined, undefined, 30)
+        const repoFiles = parseStatOutput(repoResult.result || "")
 
         // Also check the logs directory for any log files
-        const logsCommand = buildFindCommandForLogs(PATHS.LOGS_DIR, DEFAULT_EXTENSIONS)
+        const logsCommand = buildFindCommandForLogs(PATHS.LOGS_DIR, LOG_EXTENSIONS)
         const logsResult = await sandbox.process.executeCommand(logsCommand, undefined, undefined, 30)
         const logsFiles = parseStatOutput(logsResult.result || "")
 

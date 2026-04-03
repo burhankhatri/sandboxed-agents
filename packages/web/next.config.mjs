@@ -14,6 +14,8 @@ const nextConfig = {
   allowedDevOrigins: [
     "**.daytonaproxy01.net",
   ],
+  // Set to true to re-enable Next.js dev indicator
+  devIndicators: false,
   images: {
     unoptimized: true,
   },

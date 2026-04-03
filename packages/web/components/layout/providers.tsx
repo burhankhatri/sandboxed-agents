@@ -51,9 +51,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <SessionProvider>
         {children}
       </SessionProvider>
-      {process.env.NODE_ENV === "development" && (
-        <ReactQueryDevtools initialIsOpen={false} />
-      )}
+      {/* Uncomment to show TanStack Query devtools */}
+      {/* {process.env.NODE_ENV === "development" && <ReactQueryDevtools initialIsOpen={false} />} */}
     </QueryClientProvider>
   )
 }

@@ -84,6 +84,8 @@ export interface UserCredentials {
   hasGeminiApiKey: boolean
   hasDaytonaApiKey: boolean
   sandboxAutoStopInterval?: number
+  squashOnMerge?: boolean
+  prDescriptionMode?: string
 }
 
 function resolveAssistantSource(m: DbMessage): AssistantSource | undefined {

@@ -32,6 +32,8 @@ export async function GET() {
             geminiApiKey: true,
             daytonaApiKey: true,
             sandboxAutoStopInterval: true,
+            squashOnMerge: true,
+            prDescriptionMode: true,
           },
         },
         // Include team membership info

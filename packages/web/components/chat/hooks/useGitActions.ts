@@ -18,6 +18,7 @@ interface UseGitActionsOptions {
   onAddMessage: (branchId: string, message: Message) => Promise<string>
   onUpdateMessage: (branchId: string, messageId: string, updates: Partial<Message>) => void | Promise<void>
   onToggleGitHistory: () => void
+  defaultSquashOnMerge?: boolean
 }
 
 /**
@@ -33,6 +34,7 @@ export function useGitActions({
   onAddMessage,
   onUpdateMessage,
   onToggleGitHistory,
+  defaultSquashOnMerge,
 }: UseGitActionsOptions) {
   // Use shared git dialogs hook for merge/rebase/tag
   const gitDialogs = useGitDialogs({
@@ -42,6 +44,7 @@ export function useGitActions({
     repoFullName,
     onAddMessage,
     onUpdateMessage,
+    defaultSquashOnMerge,
   })
 
   // Desktop-specific state

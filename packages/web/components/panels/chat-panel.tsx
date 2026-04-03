@@ -332,6 +332,7 @@ export function ChatPanel({
     onAddMessage,
     onUpdateMessage,
     onToggleGitHistory,
+    defaultSquashOnMerge: credentials?.squashOnMerge,
   })
 
   const refreshGitConflictState = useCallback(() => {

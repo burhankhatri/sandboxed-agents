@@ -149,6 +149,8 @@ export interface UserCredentialFlags {
   hasGeminiApiKey?: boolean
   /** Server has OpenRouter (or similar) so AI branch naming works without user API keys */
   hasServerLlmFallback?: boolean
+  squashOnMerge?: boolean
+  prDescriptionMode?: string
 }
 
 /**

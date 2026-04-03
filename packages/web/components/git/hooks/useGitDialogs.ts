@@ -23,6 +23,7 @@ interface UseGitDialogsOptions {
   repoFullName: string
   onAddMessage: (branchId: string, message: Message) => Promise<string>
   onUpdateMessage: (branchId: string, messageId: string, updates: Partial<Message>) => void | Promise<void>
+  defaultSquashOnMerge?: boolean
 }
 
 /**
@@ -47,6 +48,7 @@ export function useGitDialogs({
   repoFullName,
   onAddMessage,
   onUpdateMessage,
+  defaultSquashOnMerge = false,
 }: UseGitDialogsOptions) {
   const branchId = branch?.id ?? ""
   const branchIdRef = useRef(branchId)
@@ -70,7 +72,7 @@ export function useGitDialogs({
 
   // Merge-specific state
   const [mergeDirection, setMergeDirection] = useState<"into-current" | "from-current">("from-current")
-  const [squashMerge, setSquashMerge] = useState(false)
+  const [squashMerge, setSquashMerge] = useState(defaultSquashOnMerge)
 
   // Tag-specific state
   const [tagNameInput, setTagNameInput] = useState("")

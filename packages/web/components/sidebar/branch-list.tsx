@@ -340,8 +340,8 @@ export function BranchList({
                       </span>
                       {branchDiffStats && (branchDiffStats.additions > 0 || branchDiffStats.deletions > 0) && (
                         <span className="flex items-center gap-1 text-[10px]">
-                          {branchDiffStats.additions > 0 && <span className="text-green-600">+{branchDiffStats.additions}</span>}
-                          {branchDiffStats.deletions > 0 && <span className="text-red-500">-{branchDiffStats.deletions}</span>}
+                          {branchDiffStats.additions > 0 && <span style={{ color: "#1a7f37" }}>+{branchDiffStats.additions}</span>}
+                          {branchDiffStats.deletions > 0 && <span style={{ color: "#d1242f" }}>-{branchDiffStats.deletions}</span>}
                         </span>
                       )}
                     </div>

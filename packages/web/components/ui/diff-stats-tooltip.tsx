@@ -39,17 +39,15 @@ export function DiffStatsTooltip({ additions, deletions, className }: DiffStatsT
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="text-green-600 font-medium">+{additions}</span>
-      <span className="text-red-600 font-medium">−{deletions}</span>
+      <span className="font-medium" style={{ color: "#1a7f37" }}>+{additions}</span>
+      <span className="font-medium" style={{ color: "#d1242f" }}>−{deletions}</span>
       {total > 0 && (
         <span className="flex gap-px">
           {Array.from({ length: 5 }).map((_, i) => (
             <span
               key={i}
-              className={cn(
-                "w-1.5 h-2 rounded-[1px]",
-                i < greenSegments ? "bg-green-500" : "bg-red-500"
-              )}
+              className="w-1.5 h-2 rounded-[1px]"
+              style={{ backgroundColor: i < greenSegments ? "#1a7f37" : "#d1242f" }}
             />
           ))}
         </span>

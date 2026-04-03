@@ -314,13 +314,12 @@ function ServerPreviewPopover({
         <div className="flex items-center justify-between border-b border-border px-3 py-2 bg-muted/30">
           <div className="flex items-center gap-2 min-w-0">
             <Globe className="h-3.5 w-3.5 text-foreground shrink-0" />
-            <span className="font-mono text-xs truncate">:{server.port}</span>
+            <span className="font-mono text-xs truncate">{server.url}</span>
           </div>
           <button
             onClick={handleOpenExternal}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0 ml-2"
           >
-            <span>Open</span>
             <ExternalLink className="h-3 w-3" />
           </button>
         </div>

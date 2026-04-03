@@ -57,6 +57,7 @@ export async function GET() {
         owner: r.owner,
         avatar: r.avatar,
         defaultBranch: r.defaultBranch,
+        preferredBaseBranch: r.preferredBaseBranch,
         branches: r.branches.map((b) => ({
           id: b.id,
           name: b.name,

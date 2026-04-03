@@ -1,11 +1,12 @@
 "use client"
 
 import { cn } from "@/lib/shared/utils"
-import { X, Terminal, Copy, Check, Loader2, Clock, Bot, Box, Key, ExternalLink, AlertTriangle, Trash2 } from "lucide-react"
+import { X, Terminal, Copy, Check, Loader2, Clock, Bot, Box, Key, ExternalLink, AlertTriangle, Trash2, Sun, Moon, Monitor } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Input } from "@/components/ui/input"
 
-type SettingsTab = "agents" | "sandboxes"
+type SettingsTab = "agents" | "sandboxes" | "appearance"
 
 interface SettingsModalProps {
   open: boolean
@@ -32,6 +33,7 @@ type ClearableKey = "anthropicApiKey" | "anthropicAuthToken" | "openaiApiKey" | 
 
 export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate, highlightField, onClearHighlight }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("agents")
+  const { theme, setTheme } = useTheme()
 
   // Anthropic credentials (separate API key and subscription)
   const [anthropicApiKey, setAnthropicApiKey] = useState("")
@@ -310,6 +312,18 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
           >
             <Box className="h-3.5 w-3.5" />
             Sandboxes
+          </button>
+          <button
+            onClick={() => setActiveTab("appearance")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors cursor-pointer border-b-2 -mb-px",
+              activeTab === "appearance"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Sun className="h-3.5 w-3.5" />
+            Appearance
           </button>
         </div>
 
@@ -644,6 +658,38 @@ export function SettingsModal({ open, onClose, credentials, onCredentialsUpdate,
                 <p className="text-[11px] text-muted-foreground">
                   Sandboxes will auto-stop after {sandboxAutoStopInterval} minutes of inactivity
                 </p>
+              </div>
+            </>
+          )}
+
+          {activeTab === "appearance" && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-foreground">Theme</label>
+                <p className="text-[11px] text-muted-foreground">
+                  Choose how the app looks. System will match your OS preference.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {([
+                  { value: "system", label: "System", icon: Monitor },
+                  { value: "light", label: "Light", icon: Sun },
+                  { value: "dark", label: "Dark", icon: Moon },
+                ] as const).map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    className={cn(
+                      "flex flex-1 flex-col items-center gap-2 rounded-lg border px-4 py-3 text-xs font-medium transition-colors cursor-pointer",
+                      theme === value
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-secondary text-muted-foreground hover:text-foreground hover:border-foreground/20"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {label}
+                  </button>
+                ))}
               </div>
             </>
           )}

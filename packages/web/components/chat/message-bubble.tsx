@@ -123,6 +123,9 @@ interface FilePreviewContent {
 
 const PREVIEW_LINES = 50
 
+/** Tool names whose output (stdout/stderr) should be shown in the timeline. */
+const TOOL_OUTPUT_TOOLS = ["Bash", "Shell", "Exec", "Run"] as const
+
 /**
  * Format file size for display
  */
@@ -372,9 +375,10 @@ function ToolCallTimeline({ toolCalls, sandboxId, repoPath }: { toolCalls: ToolC
           // Check if this is a file-related tool with a file path
           const isFileRelatedTool = ["Read", "Edit", "Write"].includes(tc.tool)
           const hasFilePath = isFileRelatedTool && tc.filePath
-          // Only show output dropdown for commands that produce stdout/stderr
-          const hasOutput = typeof tc.output === "string" && tc.output.length > 0
-
+          // Only show output chevron for shell commands that produce stdout/stderr
+          const hasOutput = TOOL_OUTPUT_TOOLS.includes(tc.tool as typeof TOOL_OUTPUT_TOOLS[number]) &&
+                            typeof tc.output === "string" && tc.output.length > 0
+                            
           return (
             <div key={tc.id} className="relative py-[5px] min-w-0">
               <div className="flex items-start gap-2.5 min-w-0">

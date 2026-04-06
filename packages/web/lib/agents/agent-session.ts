@@ -320,6 +320,7 @@ export async function createBackgroundAgentSession(
         systemPrompt,
         model: modelToUse,
         env: options.env,
+        cwd: options.repoPath,
       })
     : await createSession(provider, {
         sandbox: sandbox as any,
@@ -327,6 +328,7 @@ export async function createBackgroundAgentSession(
         model: modelToUse,
         sessionId: options.sessionId,
         env: options.env,
+        cwd: options.repoPath,
       })
   console.log(`[createBackgroundAgentSession] ${options.backgroundSessionId ? "get" : "create"} took ${Date.now() - t0}ms`)
 

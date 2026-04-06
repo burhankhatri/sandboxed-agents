@@ -134,18 +134,19 @@ export const agentModels: Record<Agent, ModelOption[]> = {
     { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", requiresKey: "gemini" },
   ],
   "pi": [
-    // Anthropic models (default provider)
-    { value: "sonnet", label: "Claude Sonnet (Recommended)", requiresKey: "anthropic" },
-    { value: "opus", label: "Claude Opus", requiresKey: "anthropic" },
-    { value: "haiku", label: "Claude Haiku", requiresKey: "anthropic" },
-    // OpenAI models
+    // Anthropic models (default provider) - uses short names that map to latest versions
+    { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5 (Recommended)", requiresKey: "anthropic" },
+    { value: "claude-opus-4-5", label: "Claude Opus 4.5", requiresKey: "anthropic" },
+    { value: "claude-haiku-4-5", label: "Claude Haiku 4.5", requiresKey: "anthropic" },
+    // OpenAI models - uses openai/ prefix
     { value: "openai/gpt-4o", label: "GPT-4o", requiresKey: "openai" },
     { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", requiresKey: "openai" },
     { value: "openai/o3", label: "o3", requiresKey: "openai" },
     { value: "openai/o3-mini", label: "o3 Mini", requiresKey: "openai" },
-    // Google models
-    { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", requiresKey: "gemini" },
+    { value: "openai/gpt-5", label: "GPT-5", requiresKey: "openai" },
+    // Google models - uses google/ prefix
     { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", requiresKey: "gemini" },
+    { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", requiresKey: "gemini" },
   ],
 }
 
@@ -156,7 +157,7 @@ export const defaultAgentModel: Record<Agent, string> = {
   "opencode": "opencode/big-pickle",
   "codex": "gpt-5.4",
   "gemini": "gemini-2.5-flash",
-  "pi": "sonnet",
+  "pi": "claude-sonnet-4-5",
 }
 
 // User credentials for filtering

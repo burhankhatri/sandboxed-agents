@@ -67,7 +67,6 @@ function getEnvForModel(
     openaiApiKey?: string
     opencodeApiKey?: string
     geminiApiKey?: string
-    piApiKey?: string
   }
 ): Record<string, string> {
   const env: Record<string, string> = {}
@@ -174,9 +173,7 @@ export async function ensureSandboxReady(
   // Repository ID for fetching MCP server configs
   repoId?: string,
   // Gemini API key for Gemini agent
-  geminiApiKey?: string,
-  // Pi API key for Pi agent (optional, uses Anthropic by default)
-  piApiKey?: string
+  geminiApiKey?: string
 ): Promise<{
   sandbox: Awaited<ReturnType<InstanceType<typeof Daytona>["get"]>>
   wasResumed: boolean
@@ -281,7 +278,6 @@ export async function ensureSandboxReady(
     openaiApiKey,
     opencodeApiKey,
     geminiApiKey,
-    piApiKey,
   })
 
   // Get user-provided repo-level env vars (decrypted)

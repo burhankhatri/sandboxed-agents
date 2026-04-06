@@ -166,7 +166,6 @@ export interface UserCredentialFlags {
   hasOpenaiApiKey?: boolean
   hasOpencodeApiKey?: boolean
   hasGeminiApiKey?: boolean
-  hasPiApiKey?: boolean
   /** Server has OpenRouter (or similar) so AI branch naming works without user API keys */
   hasServerLlmFallback?: boolean
   squashOnMerge?: boolean
@@ -212,7 +211,7 @@ export function hasGeminiCredentials(credentials: UserCredentialFlags | null | u
  * Returns true if user has any compatible API key.
  */
 export function hasPiCredentials(credentials: UserCredentialFlags | null | undefined): boolean {
-  return !!(credentials?.hasAnthropicApiKey || credentials?.hasOpenaiApiKey || credentials?.hasGeminiApiKey || credentials?.hasPiApiKey)
+  return !!(credentials?.hasAnthropicApiKey || credentials?.hasOpenaiApiKey || credentials?.hasGeminiApiKey)
 }
 
 /**
@@ -254,8 +253,6 @@ export function hasCredentialsForModel(
       return !!credentials?.hasOpencodeApiKey
     case "gemini":
       return !!credentials?.hasGeminiApiKey
-    case "pi":
-      return !!credentials?.hasPiApiKey
     default:
       return true
   }

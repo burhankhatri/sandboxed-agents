@@ -51,7 +51,7 @@ function AssistantContent({ message }: { message: Message }) {
     <div className="space-y-2 text-sm">
       {/* Tool Calls */}
       {hasToolCalls && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {message.toolCalls!.map((tool, index) => (
             <ToolCallItem key={index} tool={tool} />
           ))}
@@ -84,7 +84,7 @@ interface ToolCallItemProps {
 }
 
 function ToolCallItem({ tool }: ToolCallItemProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   const Icon = getToolIcon(tool.tool)
   const hasOutput = !!tool.output

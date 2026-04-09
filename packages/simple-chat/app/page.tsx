@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession, signIn } from "next-auth/react"
 import { Sidebar } from "@/components/Sidebar"
 import { ChatPanel } from "@/components/ChatPanel"
@@ -31,6 +31,13 @@ export default function HomePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(260)
+
+  // Auto-create a new chat if none exists after hydration
+  useEffect(() => {
+    if (isHydrated && !currentChatId) {
+      startNewChat()
+    }
+  }, [isHydrated, currentChatId, startNewChat])
 
   // Handler for new chat - creates with NEW_REPOSITORY by default
   const handleNewChat = () => {

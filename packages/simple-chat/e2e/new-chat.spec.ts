@@ -7,12 +7,8 @@ test.describe("New Chat Flow", () => {
 
     // Should see the welcome screen with "Background Agents" title
     await expect(page.locator("h1")).toContainText("Background Agents")
-    await expect(page.locator("h2")).toContainText("Welcome to Background Agents")
 
-    // Click "New Chat" button
-    await page.click('button:has-text("New Chat")')
-
-    // Should now see the new chat view with "What would you like to build?"
+    // New chat view shows immediately - "What would you like to build?"
     await expect(page.locator("h2")).toContainText("What would you like to build?")
 
     // Should see "New Repository" in the chat input
@@ -31,17 +27,16 @@ test.describe("New Chat Flow", () => {
     // Should see the user message appear
     await expect(page.locator("text=Create a simple hello world file")).toBeVisible()
 
-    // Should see "Creating sandbox..." status (may be quick)
-    // Wait for either creating status or running status
+    // Wait for the agent to start working - look for the stop button (square icon)
+    // or for loading state in placeholder
     await expect(
-      page.locator("text=Creating sandbox...").or(page.locator("text=Agent working..."))
+      page.locator('textarea[placeholder="Creating sandbox..."]').or(
+        page.locator('textarea[placeholder="Agent is working..."]')
+      )
     ).toBeVisible({ timeout: 30_000 })
 
-    // Wait for agent to start working (sandbox created successfully)
-    await expect(page.locator("text=Agent working...")).toBeVisible({ timeout: 120_000 })
-
-    // Wait for agent to complete - the "Agent working..." should disappear
-    await expect(page.locator("text=Agent working...")).not.toBeVisible({ timeout: 180_000 })
+    // Wait for agent to complete - placeholder should return to "Message..."
+    await expect(page.locator('textarea[placeholder="Message..."]')).toBeVisible({ timeout: 180_000 })
 
     // Verify no error messages appeared
     const errorTexts = ["Failed to create sandbox", "Missing required field"]
@@ -60,21 +55,16 @@ test.describe("New Chat Flow", () => {
     // Should see Background Agents title
     await expect(page.locator("h1")).toContainText("Background Agents")
 
-    // Should see welcome message
-    await expect(page.locator("h2")).toContainText("Welcome to Background Agents")
+    // Should see "What would you like to build?" for new chat
+    await expect(page.locator("h2")).toContainText("What would you like to build?")
 
-    // Check for the welcome text (use first() to handle multiple matches)
-    await expect(page.getByText("Click \"New Chat\" to start").first()).toBeVisible()
-
-    // New Chat button should be visible
-    await expect(page.locator('button:has-text("New Chat")')).toBeVisible()
+    // Should see agent and model selectors
+    await expect(page.locator("text=OpenCode")).toBeVisible()
+    await expect(page.locator("text=Claude Sonnet")).toBeVisible()
   })
 
-  test("should create new chat with New Repository selected by default", async ({ page }) => {
+  test("should have New Repository selected by default", async ({ page }) => {
     await page.goto("/")
-
-    // Click New Chat
-    await page.click('button:has-text("New Chat")')
 
     // Should show "New Repository" selector
     await expect(page.locator("text=New Repository")).toBeVisible()

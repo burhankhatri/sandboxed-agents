@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Square, Loader2, ChevronDown } from "lucide-react"
+import { Send, Square, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 import { NEW_REPOSITORY } from "@/lib/types"
@@ -50,15 +50,12 @@ export function ChatPanel({ chat, onSendMessage, onStopAgent, onChangeRepo }: Ch
     }
   }
 
-  // No chat selected - show welcome
+  // No chat selected - show loading state while creating
   if (!chat) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center max-w-md px-4">
-          <h2 className="text-2xl font-semibold mb-2">Welcome to Background Agents</h2>
-          <p className="text-muted-foreground">
-            Click "New Chat" to start a conversation with an AI coding agent.
-          </p>
+          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
         </div>
       </div>
     )
@@ -137,19 +134,20 @@ export function ChatPanel({ chat, onSendMessage, onStopAgent, onChangeRepo }: Ch
             </span>
           )}
 
-          {/* Status indicators */}
-          {chat.status === "creating" && (
-            <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Creating sandbox...
-            </span>
-          )}
-          {chat.status === "running" && (
-            <span className="ml-auto flex items-center gap-1 text-xs text-primary">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Agent working...
-            </span>
-          )}
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Agent selector */}
+          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            OpenCode
+            <ChevronDown className="h-3 w-3" />
+          </button>
+
+          {/* Model selector */}
+          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            Claude Sonnet
+            <ChevronDown className="h-3 w-3" />
+          </button>
         </div>
       </div>
     </div>

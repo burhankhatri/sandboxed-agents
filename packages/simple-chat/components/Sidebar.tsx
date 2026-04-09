@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useSession, signIn, signOut } from "next-auth/react"
-import { Plus, Trash2, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Trash2, Settings, LogOut, PanelLeftClose, PanelLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 
@@ -86,70 +86,55 @@ export function Sidebar({
           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" />
           ) : (
-            <ChevronLeft className="h-4 w-4" />
+            <PanelLeftClose className="h-4 w-4" />
           )}
         </button>
       </div>
 
-      {/* New Chat Button */}
-      <div className="px-2 pb-2">
-        <button
-          onClick={onNewChat}
-          className={cn(
-            "flex items-center gap-2 w-full rounded-md hover:bg-accent/50 transition-colors cursor-pointer",
-            collapsed ? "justify-center p-2" : "px-2 py-2"
-          )}
-        >
-          <Plus className="h-4 w-4 text-muted-foreground" />
-          {!collapsed && <span className="text-sm text-foreground">New Chat</span>}
-        </button>
-      </div>
-
-      {/* Chat List */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-1">
-          {chats
-            .filter((chat) => chat.messages.length > 0)
-            .map((chat) => (
-              <ChatItem
-                key={chat.id}
-                chat={chat}
-                isActive={chat.id === currentChatId}
-                collapsed={collapsed}
-                onSelect={() => onSelectChat(chat.id)}
-                onDelete={() => onDeleteChat(chat.id)}
-              />
-            ))}
-        </div>
-
-        {chats.filter((chat) => chat.messages.length > 0).length === 0 && !collapsed && (
-          <div className="px-2 py-8 text-center text-sm text-muted-foreground">
-            No chats yet. Click "New Chat" to start.
+      {/* Chat List - only show when expanded */}
+      {!collapsed && (
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            {chats
+              .filter((chat) => chat.messages.length > 0)
+              .map((chat) => (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  isActive={chat.id === currentChatId}
+                  collapsed={collapsed}
+                  onSelect={() => onSelectChat(chat.id)}
+                  onDelete={() => onDeleteChat(chat.id)}
+                />
+              ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Spacer when collapsed */}
+      {collapsed && <div className="flex-1" />}
 
       {/* Footer - User & Settings */}
       <div className="mt-auto border-t border-sidebar-border p-2">
         {session?.user ? (
-          <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
-            {/* User Avatar & Name */}
-            <div
-              className={cn(
-                "flex items-center gap-2 flex-1 min-w-0",
-                collapsed && "flex-col"
-              )}
-            >
-              {session.user.image && (
-                <img
-                  src={session.user.image}
-                  alt={session.user.name || "User"}
-                  className="h-8 w-8 rounded-full"
-                />
-              )}
-              {!collapsed && (
+          collapsed ? (
+            <CollapsedUserMenu
+              user={session.user}
+              onOpenSettings={onOpenSettings}
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              {/* User Avatar & Name */}
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {session.user.image && (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name || "User"}
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">
                     {session.user.name}
@@ -158,27 +143,27 @@ export function Sidebar({
                     {session.user.email}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Action Buttons */}
-            <div className={cn("flex gap-1", collapsed && "flex-col mt-2")}>
-              <button
-                onClick={onOpenSettings}
-                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => signOut()}
-                className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              {/* Action Buttons */}
+              <div className="flex gap-1">
+                <button
+                  onClick={onOpenSettings}
+                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => signOut()}
+                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <button
             onClick={() => signIn("github")}
@@ -198,6 +183,80 @@ export function Sidebar({
           onMouseDown={startResizing}
           className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-muted-foreground/30 active:bg-muted-foreground/50 transition-colors"
         />
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// Collapsed User Menu Component
+// =============================================================================
+
+interface CollapsedUserMenuProps {
+  user: {
+    name?: string | null
+    email?: string | null
+    image?: string | null
+  }
+  onOpenSettings: () => void
+}
+
+function CollapsedUserMenu({ user, onOpenSettings }: CollapsedUserMenuProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [menuOpen])
+
+  return (
+    <div className="relative flex justify-center" ref={menuRef}>
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="cursor-pointer"
+      >
+        {user.image ? (
+          <img
+            src={user.image}
+            alt={user.name || "User"}
+            className="h-8 w-8 rounded-full"
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs">
+            {user.name?.[0] || "?"}
+          </div>
+        )}
+      </button>
+
+      {menuOpen && (
+        <div className="absolute bottom-full left-0 mb-2 w-40 rounded-md border border-border bg-popover shadow-md py-1 z-50">
+          <button
+            onClick={() => {
+              onOpenSettings()
+              setMenuOpen(false)
+            }}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </button>
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
       )}
     </div>
   )

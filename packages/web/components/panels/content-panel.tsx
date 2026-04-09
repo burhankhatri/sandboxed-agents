@@ -301,30 +301,74 @@ function TabBar({
   onClose: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const tabsContainerRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(tabs.length)
 
-  // Measure how many tabs fit
+  // Measure how many tabs fit by checking actual rendered widths
   useEffect(() => {
     const container = containerRef.current
-    if (!container) return
+    const tabsContainer = tabsContainerRef.current
+    if (!container || !tabsContainer) return
 
     const measureTabs = () => {
-      // Approximate tab width: ~120px per tab (icon + label + close + padding)
-      const TAB_WIDTH = 130
-      // Reserve space for overflow dropdown (~40px) and action buttons (~80px)
-      const RESERVED_WIDTH = 120
-      const availableWidth = container.clientWidth - RESERVED_WIDTH
-      const maxVisible = Math.max(1, Math.floor(availableWidth / TAB_WIDTH))
-      setVisibleCount(maxVisible)
+      // Get the actual width of all tabs
+      const tabElements = tabsContainer.children
+      if (tabElements.length === 0) {
+        setVisibleCount(tabs.length)
+        return
+      }
+
+      // Measure total tabs width
+      let totalTabsWidth = 0
+      const tabWidths: number[] = []
+      for (let i = 0; i < tabElements.length; i++) {
+        const width = (tabElements[i] as HTMLElement).offsetWidth
+        tabWidths.push(width)
+        totalTabsWidth += width
+      }
+
+      // Reserve space for action buttons only (~70px for + and x buttons)
+      // Only add dropdown space (~40px) if we actually need overflow
+      const ACTION_BUTTONS_WIDTH = 70
+      const DROPDOWN_WIDTH = 40
+      const containerWidth = container.clientWidth
+
+      // First check if all tabs fit without dropdown
+      const availableWithoutDropdown = containerWidth - ACTION_BUTTONS_WIDTH
+      if (totalTabsWidth <= availableWithoutDropdown) {
+        setVisibleCount(tabs.length)
+        return
+      }
+
+      // Need overflow - calculate how many tabs fit with dropdown
+      const availableWithDropdown = containerWidth - ACTION_BUTTONS_WIDTH - DROPDOWN_WIDTH
+      let visibleWidth = 0
+      let count = 0
+      for (let i = 0; i < tabWidths.length; i++) {
+        if (visibleWidth + tabWidths[i] <= availableWithDropdown) {
+          visibleWidth += tabWidths[i]
+          count++
+        } else {
+          break
+        }
+      }
+
+      setVisibleCount(Math.max(1, count))
     }
 
-    measureTabs()
+    // Use requestAnimationFrame to ensure DOM is ready
+    const rafId = requestAnimationFrame(measureTabs)
 
-    const resizeObserver = new ResizeObserver(measureTabs)
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(measureTabs)
+    })
     resizeObserver.observe(container)
 
-    return () => resizeObserver.disconnect()
-  }, [tabs.length])
+    return () => {
+      cancelAnimationFrame(rafId)
+      resizeObserver.disconnect()
+    }
+  }, [tabs.length, tabs])
 
   const visibleTabs = tabs.slice(0, visibleCount)
   const overflowTabs = tabs.slice(visibleCount)
@@ -336,7 +380,7 @@ function TabBar({
   return (
     <div ref={containerRef} className="flex items-center border-b border-border bg-muted/30 shrink-0">
       {/* Visible Tabs */}
-      <div className="flex items-center min-w-0">
+      <div ref={tabsContainerRef} className="flex items-center min-w-0">
         {visibleTabs.map((tab) => (
           <TabItem
             key={tab.id}
@@ -702,7 +746,7 @@ function TerminalTabContent({
 // Server Tab Content Component
 // ============================================================================
 
-function ServerTabContent({ tab }: { tab: ContentPanelTab }) {
+function ServerTabContent({ tab, isResizing }: { tab: ContentPanelTab; isResizing?: boolean }) {
   const [iframeLoading, setIframeLoading] = useState(true)
   const [iframeError, setIframeError] = useState(false)
 
@@ -726,6 +770,10 @@ function ServerTabContent({ tab }: { tab: ContentPanelTab }) {
 
       {/* Iframe Container */}
       <div className="relative flex-1 bg-white min-h-0">
+        {/* Overlay to capture mouse events during resize */}
+        {isResizing && (
+          <div className="absolute inset-0 z-10 cursor-col-resize" />
+        )}
         {iframeLoading && !iframeError && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -796,25 +844,26 @@ export function ContentPanel({
   const [previewUrlPattern, setPreviewUrlPattern] = useState<string | null>(propPreviewUrlPattern || null)
   const previousFilesRef = useRef<ModifiedFile[]>([])
 
-  const isResizing = useRef(false)
+  const [isResizing, setIsResizing] = useState(false)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const serverPollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // ===== Resize Logic =====
   const startResize = useCallback(() => {
-    isResizing.current = true
+    setIsResizing(true)
     document.body.style.cursor = "col-resize"
     document.body.style.userSelect = "none"
   }, [])
 
   useEffect(() => {
+    if (!isResizing) return
+
     function onMouseMove(e: MouseEvent) {
-      if (!isResizing.current) return
       const newWidth = Math.min(Math.max(window.innerWidth - e.clientX, MIN_WIDTH), MAX_WIDTH)
       setContentPanelWidth(newWidth)
     }
     function onMouseUp() {
-      isResizing.current = false
+      setIsResizing(false)
       document.body.style.cursor = ""
       document.body.style.userSelect = ""
     }
@@ -824,7 +873,7 @@ export function ContentPanel({
       window.removeEventListener("mousemove", onMouseMove)
       window.removeEventListener("mouseup", onMouseUp)
     }
-  }, [setContentPanelWidth])
+  }, [isResizing, setContentPanelWidth])
 
   // ===== File Polling =====
   const fetchModifiedFiles = useCallback(async () => {
@@ -1036,7 +1085,7 @@ export function ContentPanel({
               />
             )}
             {activeTab.type === "server" && (
-              <ServerTabContent tab={activeTab} />
+              <ServerTabContent tab={activeTab} isResizing={isResizing} />
             )}
           </>
         ) : (

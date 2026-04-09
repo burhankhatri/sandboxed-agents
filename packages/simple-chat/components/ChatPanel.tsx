@@ -210,8 +210,8 @@ export function ChatPanel({ chat, settings, onSendMessage, onStopAgent, onChange
 
         {/* Bottom row with selectors */}
         <div className="flex items-center gap-4 px-4 py-2">
-          {/* Repo selector */}
-          {canChangeRepo ? (
+          {/* Repo selector - only show before agent starts */}
+          {canChangeRepo && (
             <div className="flex items-center gap-1">
               {onChangeRepo && (
                 <button
@@ -232,10 +232,6 @@ export function ChatPanel({ chat, settings, onSendMessage, onStopAgent, onChange
                 </button>
               )}
             </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              {isNewRepo ? "Repository" : chat.repo}
-            </span>
           )}
 
           {/* Spacer */}

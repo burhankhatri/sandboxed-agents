@@ -58,8 +58,8 @@ test.describe("New Chat Flow", () => {
     // Should see "What would you like to build?" for new chat
     await expect(page.locator("h2")).toContainText("What would you like to build?")
 
-    // Should see the sandbox info text
-    await expect(page.locator("text=Agents work in an isolated sandbox")).toBeVisible()
+    // Should see the sandbox info text (below the input)
+    await expect(page.locator("text=Agents work in an isolated sandbox and work on separate git branches")).toBeVisible()
 
     // Should see agent and model selectors
     await expect(page.locator("text=OpenCode")).toBeVisible()

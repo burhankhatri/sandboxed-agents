@@ -107,7 +107,7 @@ export function RepoPickerModal({ open, onClose, onSelect }: RepoPickerModalProp
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-popover border border-border rounded-lg shadow-lg z-50">
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-popover border border-border rounded-lg shadow-lg z-50 overflow-visible">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <Dialog.Title className="text-sm font-semibold">
@@ -192,7 +192,7 @@ export function RepoPickerModal({ open, onClose, onSelect }: RepoPickerModalProp
             )}
 
             {!loading && !error && step === "branch" && (
-              <div className="p-4">
+              <div className="p-4 overflow-visible">
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-2">Base Branch</label>
                   <div className="relative">
@@ -208,38 +208,26 @@ export function RepoPickerModal({ open, onClose, onSelect }: RepoPickerModalProp
                     </button>
 
                     {showBranchDropdown && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-10 max-h-48 overflow-hidden">
-                        <div className="p-2 border-b border-border">
-                          <input
-                            type="text"
-                            value={branchSearch}
-                            onChange={(e) => setBranchSearch(e.target.value)}
-                            placeholder="Search branches..."
-                            className="w-full px-2 py-1 text-sm bg-input border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="max-h-32 overflow-y-auto">
-                          {filteredBranches.length === 0 ? (
-                            <div className="p-2 text-sm text-muted-foreground text-center">
-                              No branches found
-                            </div>
-                          ) : (
-                            filteredBranches.map((branch) => (
-                              <button
-                                key={branch.name}
-                                onClick={() => handleSelectBranchFromDropdown(branch)}
-                                className={cn(
-                                  "flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors text-left cursor-pointer",
-                                  branch.name === selectedBranch && "bg-accent"
-                                )}
-                              >
-                                <GitBranch className="h-3 w-3 text-muted-foreground" />
-                                {branch.name}
-                              </button>
-                            ))
-                          )}
-                        </div>
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-[100] max-h-48 overflow-y-auto">
+                        {branches.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No branches found
+                          </div>
+                        ) : (
+                          branches.map((branch) => (
+                            <button
+                              key={branch.name}
+                              onClick={() => handleSelectBranchFromDropdown(branch)}
+                              className={cn(
+                                "flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors text-left cursor-pointer",
+                                branch.name === selectedBranch && "bg-accent"
+                              )}
+                            >
+                              <GitBranch className="h-3 w-3 text-muted-foreground" />
+                              {branch.name}
+                            </button>
+                          ))
+                        )}
                       </div>
                     )}
                   </div>

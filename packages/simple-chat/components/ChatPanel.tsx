@@ -96,14 +96,14 @@ export function ChatPanel({ chat, onSendMessage, onStopAgent, onChangeRepo }: Ch
           {isRunning ? (
             <button
               onClick={onStopAgent}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/80 text-white hover:bg-red-500 transition-colors cursor-pointer"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-red-500/80 text-white hover:bg-red-500 transition-colors cursor-pointer"
             >
               <Square className="h-3 w-3" />
             </button>
           ) : canSend ? (
             <button
               onClick={handleSend}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors"
             >
               <ArrowUp className="h-4 w-4" />
             </button>
@@ -152,12 +152,12 @@ export function ChatPanel({ chat, onSendMessage, onStopAgent, onChangeRepo }: Ch
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background p-4">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-semibold mb-2">What would you like to build?</h2>
-          <p className="text-sm text-muted-foreground">
-            Agents work in an isolated sandbox and create a new git branch for changes.
-          </p>
+          <h2 className="text-2xl font-semibold">What would you like to build?</h2>
         </div>
         {chatInput}
+        <p className="text-sm text-muted-foreground mt-4">
+          Agents work in an isolated sandbox and work on separate git branches.
+        </p>
       </div>
     )
   }

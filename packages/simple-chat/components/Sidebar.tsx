@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import { useSession, signIn, signOut } from "next-auth/react"
-import { Plus, Trash2, Settings, LogOut, PanelLeftClose, PanelLeft } from "lucide-react"
+import { Plus, Trash2, Settings, LogOut, PanelLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 
@@ -77,7 +77,10 @@ export function Sidebar({
       style={{ width: collapsed ? COLLAPSED_WIDTH : width }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3">
+      <div className={cn(
+        "flex items-center p-3",
+        collapsed ? "justify-center" : "justify-between"
+      )}>
         {!collapsed && (
           <h1 className="text-sm font-semibold text-foreground">
             Background Agents
@@ -87,21 +90,17 @@ export function Sidebar({
           onClick={onToggleCollapse}
           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          {collapsed ? (
-            <PanelLeft className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
+          <PanelLeft className="h-4 w-4" />
         </button>
       </div>
 
       {/* New Chat Button */}
-      <div className="px-2 pb-2">
+      <div className={cn("pb-2", collapsed ? "px-0 flex justify-center" : "px-2")}>
         <button
           onClick={onNewChat}
           className={cn(
-            "flex items-center gap-2 w-full rounded-md hover:bg-accent/50 transition-colors cursor-pointer",
-            collapsed ? "justify-center p-2" : "px-2 py-2"
+            "flex items-center gap-2 rounded-md hover:bg-accent/50 transition-colors cursor-pointer",
+            collapsed ? "p-1.5" : "w-full px-2 py-2"
           )}
         >
           <Plus className="h-4 w-4 text-muted-foreground" />

@@ -9,8 +9,8 @@ import type {
   ToolStartEvent,
   ToolEndEvent,
 } from "@upstream/agents"
-import type { ContentBlock, ToolCall } from "./types.js"
-import { PATHS, SANDBOX_CONFIG } from "./constants.js"
+import type { ContentBlock, ToolCall } from "./types"
+import { PATHS, SANDBOX_CONFIG } from "./constants"
 
 // =============================================================================
 // Tool Name Mapping (SDK uses lowercase, UI expects PascalCase)

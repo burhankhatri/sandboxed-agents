@@ -4,7 +4,7 @@
  */
 
 // Constants
-export { PATHS, SANDBOX_CONFIG, TIMEOUTS } from "./constants.js"
+export { PATHS, SANDBOX_CONFIG, TIMEOUTS } from "./constants"
 
 // Types
 export type {
@@ -12,7 +12,7 @@ export type {
   ToolCall,
   AgentStatus,
   AgentStatusResponse,
-} from "./types.js"
+} from "./types"
 
 // Session utilities
 export {
@@ -20,7 +20,7 @@ export {
   buildSystemPrompt,
   buildContentBlocks,
   type BuildContentBlocksResult,
-} from "./session.js"
+} from "./session"
 
 // Agent configuration
 export {
@@ -45,4 +45,4 @@ export {
   hasCredentialsForModel,
   getDefaultModelForAgent,
   getModelLabel,
-} from "./agents.js"
+} from "./agents"

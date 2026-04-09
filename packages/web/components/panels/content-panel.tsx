@@ -543,16 +543,16 @@ function TerminalTabContent({
       <div
         ref={outputRef}
         onClick={handleContainerClick}
-        className="flex-1 bg-[#1a1a1a] text-[#e0e0e0] font-mono text-xs p-2 overflow-auto cursor-text min-h-0"
+        className="flex-1 bg-muted/50 dark:bg-[#1a1a1a] text-foreground dark:text-[#e0e0e0] font-mono text-xs p-2 overflow-auto cursor-text min-h-0"
       >
         {lines.map((line, index) => (
           <div
             key={index}
             className={cn(
               "whitespace-pre-wrap break-all leading-relaxed",
-              line.type === "input" && "text-[#7cb7ff]",
-              line.type === "error" && "text-[#ff6b6b]",
-              line.type === "output" && "text-[#e0e0e0]"
+              line.type === "input" && "text-blue-600 dark:text-[#7cb7ff]",
+              line.type === "error" && "text-red-600 dark:text-[#ff6b6b]",
+              line.type === "output" && "text-foreground dark:text-[#e0e0e0]"
             )}
           >
             {line.content || "\u00A0"}
@@ -560,7 +560,7 @@ function TerminalTabContent({
         ))}
 
         {/* Input Line */}
-        <div className="flex items-center text-[#7cb7ff]">
+        <div className="flex items-center text-blue-600 dark:text-[#7cb7ff]">
           <span className="mr-1">$</span>
           <input
             ref={inputRef}
@@ -569,7 +569,7 @@ function TerminalTabContent({
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isExecuting}
-            className="flex-1 bg-transparent outline-none text-[#e0e0e0] caret-[#7cb7ff]"
+            className="flex-1 bg-transparent outline-none text-foreground dark:text-[#e0e0e0] caret-blue-600 dark:caret-[#7cb7ff]"
             spellCheck={false}
             autoComplete="off"
           />

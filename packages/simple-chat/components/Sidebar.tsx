@@ -3,7 +3,7 @@
 import { useRef, useCallback, useEffect } from "react"
 import { useSession, signIn, signOut } from "next-auth/react"
 import { Plus, MessageSquare, Trash2, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react"
-import { cn, formatRelativeTime } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 
 const MIN_WIDTH = 200
@@ -235,7 +235,7 @@ function ChatItem({ chat, isActive, collapsed, onSelect, onDelete }: ChatItemPro
           <div className="flex-1 min-w-0">
             <div className="text-sm truncate">{displayName}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {repoName} • {formatRelativeTime(chat.updatedAt)}
+              {repoName}
             </div>
           </div>
 

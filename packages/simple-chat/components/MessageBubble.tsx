@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { User, Bot, ChevronDown, ChevronRight, Terminal, FileText, Search } from "lucide-react"
+import { ChevronDown, ChevronRight, Terminal, FileText, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/lib/types"
 import ReactMarkdown from "react-markdown"
@@ -15,33 +15,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user"
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
-      {/* Avatar */}
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary text-primary-foreground" : "bg-secondary"
-        )}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </div>
-
+    <div className={cn("flex", isUser && "justify-end")}>
       {/* Content */}
-      <div className={cn("flex-1 max-w-[85%]", isUser && "text-right")}>
-        <div
-          className={cn(
-            "inline-block rounded-lg px-4 py-2 text-sm",
-            isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground"
-          )}
-        >
-          {isUser ? (
+      <div className={cn("max-w-[90%]", isUser && "text-right")}>
+        {isUser ? (
+          <div className="inline-block rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground">
             <p className="whitespace-pre-wrap">{message.content}</p>
-          ) : (
-            <AssistantContent message={message} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <AssistantContent message={message} />
+        )}
       </div>
     </div>
   )
@@ -52,19 +35,31 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 // =============================================================================
 
 function AssistantContent({ message }: { message: Message }) {
+  const hasContent = message.content && message.content.trim().length > 0
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0
+  const isEmpty = !hasContent && !hasToolCalls
+
+  if (isEmpty) {
+    return (
+      <div className="text-2xl text-muted-foreground animate-pulse">
+        ...
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 text-sm">
       {/* Tool Calls */}
-      {message.toolCalls && message.toolCalls.length > 0 && (
+      {hasToolCalls && (
         <div className="space-y-1">
-          {message.toolCalls.map((tool, index) => (
+          {message.toolCalls!.map((tool, index) => (
             <ToolCallItem key={index} tool={tool} />
           ))}
         </div>
       )}
 
       {/* Text Content */}
-      {message.content && (
+      {hasContent && (
         <div className="prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {message.content}

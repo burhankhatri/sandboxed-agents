@@ -45,7 +45,17 @@ export function Sidebar({
 }: SidebarProps) {
   const { data: session } = useSession()
   const isResizing = useRef(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   const sidebarRef = useRef<HTMLDivElement>(null)
+
+  // Animate collapse/expand when toggled via button
+  const handleToggleCollapse = useCallback(() => {
+    setIsAnimating(true)
+    onToggleCollapse()
+    // Remove transition after animation completes
+    const timer = setTimeout(() => setIsAnimating(false), 200)
+    return () => clearTimeout(timer)
+  }, [onToggleCollapse])
 
   // Handle drag resize
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -92,7 +102,10 @@ export function Sidebar({
   return (
     <div
       ref={sidebarRef}
-      className="relative flex h-full flex-col bg-background border-r border-sidebar-border"
+      className={cn(
+        "relative flex h-full flex-col bg-background border-r border-sidebar-border overflow-hidden",
+        isAnimating && "transition-[width] duration-200 ease-in-out"
+      )}
       style={{ width: collapsed ? COLLAPSED_WIDTH : width }}
     >
       {/* Header */}
@@ -106,7 +119,7 @@ export function Sidebar({
           </h1>
         )}
         <button
-          onClick={onToggleCollapse}
+          onClick={handleToggleCollapse}
           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <PanelLeft className="h-4 w-4" />

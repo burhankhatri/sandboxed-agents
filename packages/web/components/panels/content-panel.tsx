@@ -111,12 +111,6 @@ function getExtColor(ext: string): string {
   return colors[ext] || "text-foreground"
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000)
   if (seconds < 10) return "just now"
@@ -381,26 +375,15 @@ function FileTabContent({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2 bg-muted/30 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium truncate">{tab.filename}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground shrink-0">
-          <span>{formatSize(content.size)}</span>
-          <span>{formatRelativeTime(content.modifiedAt)}</span>
-        </div>
-      </div>
-
       {/* Content */}
       <div className="flex-1 overflow-auto min-h-0">
         <HighlightedCode code={content.content} />
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border px-3 py-1.5 bg-muted/30 shrink-0">
+      <div className="flex items-center justify-between border-t border-border px-3 py-1.5 bg-muted/30 shrink-0">
         <p className="font-mono text-[10px] text-foreground/70 truncate">{tab.filePath}</p>
+        <span className="text-[10px] text-muted-foreground shrink-0">{formatRelativeTime(content.modifiedAt)}</span>
       </div>
     </div>
   )

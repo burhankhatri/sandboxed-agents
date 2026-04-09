@@ -5,7 +5,6 @@ import { cn } from "@/lib/shared/utils"
 import { useUIStore, ContentPanelTab } from "@/lib/stores/ui-store"
 import {
   X,
-  Terminal,
   Globe,
   ExternalLink,
   FileCode,
@@ -220,7 +219,7 @@ function TabIcon({ tab, className }: { tab: ContentPanelTab; className?: string 
     return <FileCode className={cn("h-3 w-3", getExtColor(ext), className)} />
   }
   if (tab.type === "terminal") {
-    return <Terminal className={cn("h-3 w-3 text-muted-foreground", className)} />
+    return <SquareTerminal className={cn("h-3 w-3 text-muted-foreground", className)} />
   }
   if (tab.type === "server") {
     return <Globe className={cn("h-3 w-3 text-green-500", className)} />
@@ -559,21 +558,11 @@ function TerminalTabContent({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2 bg-muted/30 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <SquareTerminal className="h-3.5 w-3.5 text-foreground shrink-0" />
-          <span className="font-mono text-xs truncate">{currentDir}</span>
-        </div>
-      </div>
-
-      {/* Terminal Output */}
-      <div
-        ref={outputRef}
-        onClick={handleContainerClick}
-        className="flex-1 bg-muted/50 dark:bg-[#1a1a1a] text-foreground dark:text-[#e0e0e0] font-mono text-xs p-2 overflow-auto cursor-text min-h-0"
-      >
+    <div
+      ref={outputRef}
+      onClick={handleContainerClick}
+      className="flex-1 bg-muted/50 dark:bg-[#1a1a1a] text-foreground dark:text-[#e0e0e0] font-mono text-xs p-2 overflow-auto cursor-text h-full"
+    >
         {lines.map((line, index) => (
           <div
             key={index}
@@ -607,7 +596,6 @@ function TerminalTabContent({
           )}
         </div>
       </div>
-    </div>
   )
 }
 

@@ -15,6 +15,7 @@ export const GEMINI_TOOL_MAPPINGS: Record<string, string> = {
   write_todos: "write",
   read_file: "read",
   apply_patch: "edit",
+  replace: "edit",
   // Search
   glob_file_search: "glob",
   list_directory: "glob",
